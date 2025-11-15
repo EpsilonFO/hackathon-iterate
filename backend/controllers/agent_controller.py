@@ -1,13 +1,14 @@
 """Controller for ElevenLabs agent service endpoints."""
 
 import os
-from typing import Optional
+from typing import Dict, Optional
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from backend.services.elevenlabs_agent_service import call_agent, save_transcript
+from backend.services.elevenlabs_agent_service import call_agent
+from backend.services.transcript_parser_service import TranscriptParserService
 
 load_dotenv()
 
@@ -19,6 +20,7 @@ class StartConversationRequest(BaseModel):
 
     agent_id: Optional[str] = None
     api_key: Optional[str] = None
+    supplier_name: Optional[str] = None
 
 
 class ConversationResponse(BaseModel):
@@ -28,7 +30,7 @@ class ConversationResponse(BaseModel):
     agent_id: str
     timestamp: str
     total_messages: int
-    filename: Optional[str] = None
+    updates: Dict[str, Dict[str, float]]
 
 
 @router.post("/start", response_model=ConversationResponse)
@@ -45,6 +47,8 @@ async def start_conversation(request: StartConversationRequest):
     print("Starting conversation...")
     agent_id = request.agent_id or os.getenv("AGENT_ID")
     api_key = request.api_key or os.getenv("ELEVENLABS_API_KEY")
+    anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+    parser = TranscriptParserService(api_key=anthropic_api_key, data_dir="./data")
 
     if not agent_id or not api_key:
         raise HTTPException(
@@ -54,17 +58,18 @@ async def start_conversation(request: StartConversationRequest):
 
     try:
         # Launch the agent conversation
-        result = call_agent(agent_id, api_key=api_key)
+        supplier_name = request.supplier_name or "Inconnu"
+        result = call_agent(agent_id, api_key=api_key, supplier_name=supplier_name)
 
-        # Save transcript (call_agent already saves it, but we ensure it's saved)
-        filename = save_transcript(result)
+        # Parse the conversation - pass the full result dict, not just messages
+        updates = parser.parse_conversation(result, supplier_name)
 
         return ConversationResponse(
             conversation_id=result["conversation_id"],
             agent_id=result["agent_id"],
             timestamp=result["timestamp"],
             total_messages=result["total_messages"],
-            filename=filename,
+            updates=updates,
         )
 
     except Exception as e:

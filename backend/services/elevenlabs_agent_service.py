@@ -14,6 +14,7 @@ load_dotenv()
 # Store messages globally
 messages = []
 conversation_instance = None  # Store conversation instance globally
+current_supplier_name = "Inconnu"  # Store current supplier name for callbacks
 
 # Goodbye keywords to detect end of conversation
 GOODBYE_KEYWORDS = [
@@ -86,7 +87,7 @@ def should_end_conversation(text: str) -> bool:
     return False
 
 
-def call_agent(agent_id: str, api_key: str = None):
+def call_agent(agent_id: str, api_key: str = None, supplier_name: str = "Inconnu"):
     """
     Call an ElevenLabs conversational agent and return the transcript.
 
@@ -97,8 +98,9 @@ def call_agent(agent_id: str, api_key: str = None):
     Returns:
         dict: Conversation transcript with messages
     """
-    global messages, conversation_instance
+    global messages, conversation_instance, current_supplier_name
     messages = []
+    current_supplier_name = supplier_name
 
     # Initialize client
     if api_key is None:
@@ -132,7 +134,7 @@ def call_agent(agent_id: str, api_key: str = None):
         except:
             pass
         # Save transcript immediately
-        save_transcript_on_exit()
+        save_transcript_on_exit(supplier_name)
         exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
@@ -148,6 +150,7 @@ def call_agent(agent_id: str, api_key: str = None):
 
     return {
         "conversation_id": conversation_id,
+        "supplier_name": supplier_name,
         "agent_id": agent_id,
         "timestamp": datetime.now().isoformat(),
         "messages": messages,
@@ -165,7 +168,7 @@ def capture_message(role: str, text: str):
 
 def capture_agent_message(text: str, conversation):
     """Callback function to capture agent messages and detect goodbye"""
-    global messages
+    global messages, current_supplier_name
 
     # Capture the message
     message = {"role": "agent", "text": text}
@@ -183,25 +186,27 @@ def capture_agent_message(text: str, conversation):
             conversation.end_session()
         except Exception as e:
             print(f"Note: {e}")
-        save_transcript_on_exit()
+        save_transcript_on_exit(current_supplier_name)
         exit(0)
 
 
-def save_transcript(transcript_data: dict, filename: str = None):
+def save_transcript(
+    transcript_data: dict, filename: str = None, folder: str = "./data/transcripts"
+):
     """Save the transcript to a JSON file in the transcripts folder."""
     # Create transcripts folder if it doesn't exist
-    os.makedirs("../data/transcripts", exist_ok=True)
+    os.makedirs(folder, exist_ok=True)
 
     if filename is None:
         # Use conversation_id from ElevenLabs (format: conv_xxxxx)
         conversation_id = transcript_data.get("conversation_id", None)
 
         if conversation_id and conversation_id != "unknown":
-            filename = f"../data/transcripts/{conversation_id}.json"
+            filename = f"{folder}/{conversation_id}.json"
         else:
             # Fallback to timestamp if no conversation_id
             session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"../data/transcripts/transcript_{session_id}.json"
+            filename = f"{folder}/transcript_{session_id}.json"
 
     with open(filename, "w") as f:
         json.dump(transcript_data, f, indent=2, default=str)
@@ -210,7 +215,7 @@ def save_transcript(transcript_data: dict, filename: str = None):
     return filename
 
 
-def save_transcript_on_exit():
+def save_transcript_on_exit(supplier_name: str = "Inconnu"):
     """Save transcript when interrupted"""
     global messages
     if messages:
@@ -218,6 +223,7 @@ def save_transcript_on_exit():
         session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         result = {
             "conversation_id": session_id,
+            "supplier_name": supplier_name,
             "agent_id": os.getenv("AGENT_ID"),
             "timestamp": datetime.now().isoformat(),
             "messages": messages,
@@ -227,34 +233,3 @@ def save_transcript_on_exit():
         print(f"✓ Messages captured in this conversation: {len(messages)}")
     else:
         print("\n! No messages to save")
-
-
-if __name__ == "__main__":
-    # Load from environment variables
-    AGENT_ID = os.getenv("AGENT_ID")
-    API_KEY = os.getenv("ELEVENLABS_API_KEY")
-
-    if not AGENT_ID or not API_KEY:
-        print("Error: Missing AGENT_ID or ELEVENLABS_API_KEY in .env file")
-        exit(1)
-
-    try:
-        result = call_agent(AGENT_ID, api_key=API_KEY)
-
-        # Save transcript to file
-        filename = save_transcript(result)
-
-        # Also print to terminal
-        print("\n=== TRANSCRIPT SUMMARY ===")
-        print(json.dumps(result, indent=2, default=str))
-
-        print(f"\n✓ Full conversation saved to {filename}")
-        print(f"✓ Total messages: {result['total_messages']}")
-
-    except Exception as e:
-        print(f"Error: {e}")
-        print("\nMake sure you have:")
-        print("1. Installed the package: pip install elevenlabs python-dotenv")
-        print("2. Installed pyaudio: brew install portaudio && pip install pyaudio")
-        print("3. Created a .env file with AGENT_ID and ELEVENLABS_API_KEY")
-        print("4. Have microphone permissions enabled")

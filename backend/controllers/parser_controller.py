@@ -14,7 +14,7 @@ class ConversationRequest(BaseModel):
     """Request model for conversation parsing."""
 
     transcript: str
-    supplier_name: str
+    supplier_name: str | None = None
 
 
 class ConversationResponse(BaseModel):
@@ -59,7 +59,8 @@ async def parse_conversation(request: ConversationRequest):
     try:
         parser = TranscriptParserService()
         updates = parser.parse_conversation(
-            transcript=request.transcript, supplier_name=request.supplier_name
+            transcript=request.transcript,
+            supplier_name=request.supplier_name or "Inconnu",
         )
 
         count = len(updates)
