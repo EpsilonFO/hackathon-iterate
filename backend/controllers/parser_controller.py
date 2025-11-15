@@ -1,25 +1,25 @@
 """Controller for parsing phone conversation transcripts."""
 
 from typing import Dict
-from pydantic import BaseModel
+
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
-from backend.services.parser_service import ConversationParser
-
+from backend.services.transcript_parser_service import TranscriptParserService
 
 router = APIRouter(prefix="/parser", tags=["parser"])
 
 
 class ConversationRequest(BaseModel):
     """Request model for conversation parsing."""
-    
+
     transcript: str
     supplier_name: str
 
 
 class ConversationResponse(BaseModel):
     """Response model for conversation parsing."""
-    
+
     updates: Dict[str, Dict[str, float]]
     message: str
 
@@ -28,13 +28,13 @@ class ConversationResponse(BaseModel):
 async def parse_conversation(request: ConversationRequest):
     """
     Parse a phone conversation transcript to extract product updates.
-    
+
     Args:
         request: ConversationRequest containing transcript and supplier_name
-        
+
     Returns:
         ConversationResponse with extracted product updates
-        
+
     Example request:
     ```json
     {
@@ -42,7 +42,7 @@ async def parse_conversation(request: ConversationRequest):
         "supplier_name": "Pharma Depot"
     }
     ```
-    
+
     Example response:
     ```json
     {
@@ -57,27 +57,19 @@ async def parse_conversation(request: ConversationRequest):
     ```
     """
     try:
-        parser = ConversationParser()
+        parser = TranscriptParserService()
         updates = parser.parse_conversation(
-            transcript=request.transcript,
-            supplier_name=request.supplier_name
+            transcript=request.transcript, supplier_name=request.supplier_name
         )
-        
+
         count = len(updates)
         message = f"Successfully parsed {count} product update(s)"
-        
-        return ConversationResponse(
-            updates=updates,
-            message=message
-        )
-        
+
+        return ConversationResponse(updates=updates, message=message)
+
     except ValueError as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Configuration error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Configuration error: {str(e)}")
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Error parsing conversation: {str(e)}"
+            status_code=500, detail=f"Error parsing conversation: {str(e)}"
         )
