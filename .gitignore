@@ -82,3 +82,9 @@ frontend/.vite/
 frontend/.env.local
 frontend/.env.*.local
 
+frontend-rayan/node_modules/
+frontend-rayan/dist/
+frontend-rayan/.vite/
+frontend-rayan/.env.local
+frontend-rayan/.env.*.local
+
