@@ -5,19 +5,25 @@ Ce script démontre comment utiliser la classe ConversationParser pour parser
 une conversation téléphonique et mettre à jour les informations des produits.
 """
 
+import json
 import os
 import sys
-import json
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+api_key = os.getenv("ANTHROPIC_API_KEY")
 
 # Ajouter le répertoire parent au path pour les imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from backend.services.parser_service import ConversationParser
+from backend.services.transcript_parser_service import TranscriptParserService
 
 
 def test_conversation_parser():
     """Test du parser avec un exemple de conversation."""
-    
+
     # Exemple de transcription de conversation téléphonique
     example_transcript = """
     Pharmacie: Bonjour, c'est la pharmacie Martin à l'appareil. Je souhaiterais mettre à jour nos tarifs.
@@ -44,9 +50,9 @@ def test_conversation_parser():
     
     Fournisseur: Je vous en prie. À bientôt !
     """
-    
+
     supplier_name = "MedSupply Network Pro South"
-    
+
     print("=" * 80)
     print("TEST DU PARSER DE CONVERSATIONS")
     print("=" * 80)
@@ -58,11 +64,13 @@ def test_conversation_parser():
     print(example_transcript)
     print("-" * 80)
     print()
-    
+
     # Vérifier que la clé API est configurée
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        print("❌ ERREUR: La variable d'environnement ANTHROPIC_API_KEY n'est pas définie.")
+        print(
+            "❌ ERREUR: La variable d'environnement ANTHROPIC_API_KEY n'est pas définie."
+        )
         print()
         print("Pour configurer votre clé API:")
         print("1. Créez un fichier .env à la racine du projet")
@@ -70,35 +78,37 @@ def test_conversation_parser():
         print("3. Ou exportez la variable: export ANTHROPIC_API_KEY=votre_cle_api")
         print()
         return
-    
+
     try:
         # Initialiser le parser
         print("Initialisation du parser...")
-        parser = ConversationParser(api_key=api_key)
+        parser = TranscriptParserService(
+            api_key=api_key,
+            data_dir=os.path.join(os.path.dirname(__file__), "..", "data"),
+        )
         print("✓ Parser initialisé")
         print()
-        
+
         # Parser la conversation
         print("Analyse de la conversation en cours...")
         result = parser.parse_conversation(
-            transcript=example_transcript,
-            supplier_name=supplier_name
+            transcript=example_transcript, supplier_name=supplier_name
         )
         print("✓ Analyse terminée")
         print()
-        
+
         # Afficher les résultats
         print("=" * 80)
         print("RÉSULTATS")
         print("=" * 80)
         print()
-        
+
         if result:
             print(f"Nombre de mises à jour extraites: {len(result)}")
             print()
             print(json.dumps(result, indent=2, ensure_ascii=False))
             print()
-            
+
             # Afficher les détails
             print("Détails des mises à jour:")
             print("-" * 80)
@@ -110,15 +120,16 @@ def test_conversation_parser():
                     print(f"   🚚 Nouveau délai: {updates['delivery_time']} jours")
         else:
             print("Aucune mise à jour trouvée dans la conversation.")
-        
+
         print()
         print("=" * 80)
-        
+
     except ValueError as e:
         print(f"❌ Erreur de configuration: {e}")
     except Exception as e:
         print(f"❌ Erreur lors de l'analyse: {e}")
         import traceback
+
         traceback.print_exc()
 
 
