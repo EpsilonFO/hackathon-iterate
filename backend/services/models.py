@@ -1,6 +1,6 @@
 """Pydantic models for data structures."""
 
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -98,5 +98,18 @@ class ModifiedProductInformation(BaseModel):
     new_last_information_update: str
     product_id: str | None = None
     fournisseur_id: str | None = None
+
+
+class Order(BaseModel):
+    """Order model for customer orders to suppliers."""
+
+    order_id: str
+    product_name: str
+    quantity: int = Field(ge=1, description="Quantity ordered")
+    fournisseur_id: str
+    estimated_time_arrival: str
+    time_of_arrival: Optional[str] = Field(None, description="Actual arrival time, None if not yet delivered")
+    order_date: str
+
     new_price: float | None = None
     new_delivery_time: int | None = None
