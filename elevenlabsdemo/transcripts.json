@@ -1,0 +1,674 @@
+[
+  {
+    "conversation_id": "interrupted",
+    "agent_id": "agent_8101ka3nmqede8gtxm2gbnjh2tmb",
+    "timestamp": "2025-11-15T17:00:49.031690",
+    "messages": [
+      {
+        "role": "agent",
+        "text": "Hey there, I'm Alexis from Pharma City, I'm restocking this week I need your advice"
+      },
+      {
+        "role": "user",
+        "text": "What do you want to buy?"
+      },
+      {
+        "role": "agent",
+        "text": "Hello! What products do you currently have available for supply?"
+      },
+      {
+        "role": "user",
+        "text": "Anything you want."
+      },
+      {
+        "role": "agent",
+        "text": "To help me narrow it down, could you tell me which product categories you specialize in or have readily available stock for?"
+      },
+      {
+        "role": "user",
+        "text": "I said what I said earlier."
+      },
+      {
+        "role": "agent",
+        "text": "I understand you mentioned \"anything you want,\" but to make this process efficient, I need more specific information. Could you please provide a list of the product categories or types of items you supply? For example, do you offer over-the-counter medications, medical devices, or perhaps health and beauty products?"
+      }
+    ],
+    "total_messages": 7
+  },
+  {
+    "conversation_id": "interrupted",
+    "agent_id": "agent_8101ka3nmqede8gtxm2gbnjh2tmb",
+    "timestamp": "2025-11-15T17:01:21.290124",
+    "messages": [
+      {
+        "role": "agent",
+        "text": "Hey there, I'm Alexis from Pharma City, I'm restocking this week I need your advice"
+      }
+    ],
+    "total_messages": 1
+  },
+  {
+    "conversation_id": "interrupted",
+    "agent_id": "agent_8101ka3nmqede8gtxm2gbnjh2tmb",
+    "timestamp": "2025-11-15T17:45:18.440546",
+    "messages": [
+      {
+        "role": "agent",
+        "text": "Hey there, I'm Alexis from Pharma City, I'm restocking this week I need your advice"
+      },
+      {
+        "role": "user",
+        "text": "What do you want to get?"
+      },
+      {
+        "role": "agent",
+        "text": "Hello! What products do you currently have available for supply?"
+      },
+      {
+        "role": "user",
+        "text": "Currently have available for supply. Nothing. Goodbye."
+      },
+      {
+        "role": "agent",
+        "text": "I understand. Thank you for your time."
+      },
+      {
+        "role": "user",
+        "text": "I understand. Thank you for your time."
+      },
+      {
+        "role": "agent",
+        "text": "You're welcome. If your product availability changes in the future, please feel free to reach out."
+      },
+      {
+        "role": "user",
+        "text": "You're welcome. If your product availability changes in the future, please feel free to reach out. Goodbye."
+      },
+      {
+        "role": "agent",
+        "text": "Thank you. I will keep that in mind. Goodbye."
+      },
+      {
+        "role": "user",
+        "text": "I will keep that in mind, goodbye!"
+      },
+      {
+        "role": "agent",
+        "text": "Goodbye."
+      },
+      {
+        "role": "user",
+        "text": "Goodbye."
+      },
+      {
+        "role": "agent",
+        "text": "..."
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "agent",
+        "text": "Yes, I am still here. Do you have any further questions or would you like to discuss anything else?"
+      },
+      {
+        "role": "user",
+        "text": "Yes, I am still here."
+      },
+      {
+        "role": "agent",
+        "text": "Great. Do you have any other questions for me today?"
+      },
+      {
+        "role": "user",
+        "text": "Do you have any other questions for me today?"
+      },
+      {
+        "role": "agent",
+        "text": "No, I do not. Thank you for your time."
+      },
+      {
+        "role": "user",
+        "text": "Good-goodbye. No, I do not."
+      },
+      {
+        "role": "agent",
+        "text": "Understood. Goodbye."
+      }
+    ],
+    "total_messages": 23
+  },
+  {
+    "conversation_id": "interrupted",
+    "agent_id": "agent_8101ka3nmqede8gtxm2gbnjh2tmb",
+    "timestamp": "2025-11-15T17:47:47.693662",
+    "messages": [
+      {
+        "role": "agent",
+        "text": "Hey there, I'm Alexis from Pharma City, I'm restocking this week I need your advice"
+      },
+      {
+        "role": "user",
+        "text": "What? You're good?"
+      },
+      {
+        "role": "agent",
+        "text": "Hello! What products do you currently have available for supply?"
+      },
+      {
+        "role": "user",
+        "text": "For supply. Goodbye."
+      },
+      {
+        "role": "agent",
+        "text": "I apologize, it seems there was a misunderstanding. I am Alexis, a pharmacist, and I am looking to inquire about products for my pharmacy. Could you please tell me what products you currently have available for supply?"
+      },
+      {
+        "role": "user",
+        "text": "Seems there was a misunderstanding."
+      },
+      {
+        "role": "agent",
+        "text": "Yes, a misunderstanding. Could you please clarify what products you have available for supply to my pharmacy?"
+      },
+      {
+        "role": "user",
+        "text": "Yes, a misunderstanding."
+      },
+      {
+        "role": "agent",
+        "text": "Indeed..."
+      },
+      {
+        "role": "user",
+        "text": "Goodbye. To clarify, I am looking to understand what products your company currently offers for pharmacies like mine. Goodbye."
+      },
+      {
+        "role": "agent",
+        "text": "Thank you for clarifying. Could you please provide a list of the product categories you offer, along with any specific product names or formulations within those categories?"
+      },
+      {
+        "role": "user",
+        "text": "Thank you for clarifying."
+      },
+      {
+        "role": "agent",
+        "text": "Yes, thank you for clarifying. Could you please tell me what products your company currently offers for pharmacies like mine?"
+      },
+      {
+        "role": "user",
+        "text": "Yes, thank you for clarifying."
+      },
+      {
+        "role": "agent",
+        "text": "Indeed. Could you please tell me what products your company currently offers for pharmacies like mine?"
+      }
+    ],
+    "total_messages": 15
+  },
+  {
+    "conversation_id": "interrupted",
+    "agent_id": "agent_8101ka3nmqede8gtxm2gbnjh2tmb",
+    "timestamp": "2025-11-15T17:51:37.387777",
+    "messages": [
+      {
+        "role": "agent",
+        "text": "Hey there, I'm Alexis from Pharma City, I'm restocking this week I need your advice"
+      },
+      {
+        "role": "user",
+        "text": "I'm restocking this week. I need your advice. What do you need?"
+      },
+      {
+        "role": "agent",
+        "text": "Hello! What products do you currently have available for supply?"
+      },
+      {
+        "role": "user",
+        "text": "Currently have available for supply?"
+      },
+      {
+        "role": "agent",
+        "text": "Thank you. Could you please provide a list of the product categories you offer, along with any specific formulations or packaging options for each?"
+      },
+      {
+        "role": "user",
+        "text": "Goodbye! Thank you! Could you please provide a list of the product categories you offer along with any..."
+      },
+      {
+        "role": "agent",
+        "text": "Could you please provide a list of the product categories you offer along with any current promotions or bulk discounts?"
+      },
+      {
+        "role": "user",
+        "text": "Goodbye!"
+      },
+      {
+        "role": "agent",
+        "text": "I understand you need to go. Thank you for your time."
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "Goodbye!"
+      },
+      {
+        "role": "agent",
+        "text": "Understood. Thank you for your time."
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "Say goodbye"
+      },
+      {
+        "role": "agent",
+        "text": "Goodbye!"
+      }
+    ],
+    "total_messages": 29
+  },
+  {
+    "conversation_id": "conv_1901ka46r9h6fbpapw18akdw47rh",
+    "agent_id": "agent_8101ka3nmqede8gtxm2gbnjh2tmb",
+    "timestamp": "2025-11-15T17:51:38.637734",
+    "messages": [
+      {
+        "role": "agent",
+        "text": "Hey there, I'm Alexis from Pharma City, I'm restocking this week I need your advice"
+      },
+      {
+        "role": "user",
+        "text": "I'm restocking this week. I need your advice. What do you need?"
+      },
+      {
+        "role": "agent",
+        "text": "Hello! What products do you currently have available for supply?"
+      },
+      {
+        "role": "user",
+        "text": "Currently have available for supply?"
+      },
+      {
+        "role": "agent",
+        "text": "Thank you. Could you please provide a list of the product categories you offer, along with any specific formulations or packaging options for each?"
+      },
+      {
+        "role": "user",
+        "text": "Goodbye! Thank you! Could you please provide a list of the product categories you offer along with any..."
+      },
+      {
+        "role": "agent",
+        "text": "Could you please provide a list of the product categories you offer along with any current promotions or bulk discounts?"
+      },
+      {
+        "role": "user",
+        "text": "Goodbye!"
+      },
+      {
+        "role": "agent",
+        "text": "I understand you need to go. Thank you for your time."
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "Goodbye!"
+      },
+      {
+        "role": "agent",
+        "text": "Understood. Thank you for your time."
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "..."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "Say goodbye"
+      },
+      {
+        "role": "agent",
+        "text": "Goodbye!"
+      }
+    ],
+    "total_messages": 29
+  },
+  {
+    "conversation_id": "interrupted",
+    "agent_id": "agent_8101ka3nmqede8gtxm2gbnjh2tmb",
+    "timestamp": "2025-11-15T17:53:39.643657",
+    "messages": [
+      {
+        "role": "agent",
+        "text": "Hey there, I'm Alexis from Pharma City, I'm restocking this week I need your advice"
+      },
+      {
+        "role": "user",
+        "text": "All right, have a good day. Goodbye."
+      },
+      {
+        "role": "agent",
+        "text": "Hello! What products do you currently have available for supply?"
+      },
+      {
+        "role": "user",
+        "text": "Goodbye."
+      },
+      {
+        "role": "agent",
+        "text": "It seems we're having a misunderstanding. I'm here to discuss potential product supplies for my pharmacy. Are you able to provide information on your available products?"
+      },
+      {
+        "role": "user",
+        "text": "Okay, that's a problem."
+      },
+      {
+        "role": "agent",
+        "text": "..."
+      },
+      {
+        "role": "user",
+        "text": "Goodbye."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "Goodbye."
+      },
+      {
+        "role": "agent",
+        "text": "It seems we're having a communication issue. I'm here to discuss product supplies for my pharmacy. If you're a supplier, I'd like to know what products you have available."
+      }
+    ],
+    "total_messages": 11
+  },
+  {
+    "conversation_id": "interrupted",
+    "agent_id": "agent_8101ka3nmqede8gtxm2gbnjh2tmb",
+    "timestamp": "2025-11-15T17:53:39.703462",
+    "messages": [
+      {
+        "role": "agent",
+        "text": "Hey there, I'm Alexis from Pharma City, I'm restocking this week I need your advice"
+      },
+      {
+        "role": "user",
+        "text": "All right, have a good day. Goodbye."
+      },
+      {
+        "role": "agent",
+        "text": "Hello! What products do you currently have available for supply?"
+      },
+      {
+        "role": "user",
+        "text": "Goodbye."
+      },
+      {
+        "role": "agent",
+        "text": "It seems we're having a misunderstanding. I'm here to discuss potential product supplies for my pharmacy. Are you able to provide information on your available products?"
+      },
+      {
+        "role": "user",
+        "text": "Okay, that's a problem."
+      },
+      {
+        "role": "agent",
+        "text": "..."
+      },
+      {
+        "role": "user",
+        "text": "Goodbye."
+      },
+      {
+        "role": "agent",
+        "text": "Are you still there?"
+      },
+      {
+        "role": "user",
+        "text": "Goodbye."
+      },
+      {
+        "role": "agent",
+        "text": "It seems we're having a communication issue. I'm here to discuss product supplies for my pharmacy. If you're a supplier, I'd like to know what products you have available."
+      }
+    ],
+    "total_messages": 11
+  },
+  {
+    "conversation_id": "interrupted",
+    "agent_id": "agent_8101ka3nmqede8gtxm2gbnjh2tmb",
+    "timestamp": "2025-11-15T17:55:00.567258",
+    "messages": [
+      {
+        "role": "agent",
+        "text": "Hey there, I'm Alexis from Pharma City, I'm restocking this week I need your advice"
+      },
+      {
+        "role": "user",
+        "text": "How can I help you? I sell paracetamols."
+      },
+      {
+        "role": "agent",
+        "text": "Hello! What types of paracetamol products do you currently have available for supply?"
+      },
+      {
+        "role": "user",
+        "text": "I have three types of paracetamols, 25 mg, 50 mg, 75 mg."
+      },
+      {
+        "role": "agent",
+        "text": "Thank you. Could you please specify the formulations for each of those dosages, for example, tablets, capsules, or liquid? Also, what are the minimum order quantities for each type?"
+      },
+      {
+        "role": "user",
+        "text": "I have three kinds of tablets capsules I don't sell liquids also the minimum order quantity for each type is five."
+      },
+      {
+        "role": "agent",
+        "text": "Understood. So, you offer 25 milligram, 50 milligram, and 75 milligram paracetamol in tablet and capsule forms, with a minimum order quantity of five for each. Can you provide details on your pricing tiers for these products, especially for bulk purchases?"
+      },
+      {
+        "role": "user",
+        "text": "25 milligrams is three dollars 50 milligrams is six dollars 75 milligrams is seven dollars so you will make I can help you make a lot of discount"
+      },
+      {
+        "role": "agent",
+        "text": "Thank you for the pricing information. When you mention \"a lot of discount,\" could you elaborate on your bulk pricing or discount options for larger orders?"
+      },
+      {
+        "role": "user",
+        "text": "I cannot provide this right now I need to go have a good day goodbye"
+      },
+      {
+        "role": "agent",
+        "text": "Thank you for your time. Goodbye."
+      }
+    ],
+    "total_messages": 11
+  },
+  {
+    "conversation_id": "conv_2501ka46zqvae46rw79r18zv785g",
+    "agent_id": "agent_8101ka3nmqede8gtxm2gbnjh2tmb",
+    "timestamp": "2025-11-15T17:55:01.803811",
+    "messages": [
+      {
+        "role": "agent",
+        "text": "Hey there, I'm Alexis from Pharma City, I'm restocking this week I need your advice"
+      },
+      {
+        "role": "user",
+        "text": "How can I help you? I sell paracetamols."
+      },
+      {
+        "role": "agent",
+        "text": "Hello! What types of paracetamol products do you currently have available for supply?"
+      },
+      {
+        "role": "user",
+        "text": "I have three types of paracetamols, 25 mg, 50 mg, 75 mg."
+      },
+      {
+        "role": "agent",
+        "text": "Thank you. Could you please specify the formulations for each of those dosages, for example, tablets, capsules, or liquid? Also, what are the minimum order quantities for each type?"
+      },
+      {
+        "role": "user",
+        "text": "I have three kinds of tablets capsules I don't sell liquids also the minimum order quantity for each type is five."
+      },
+      {
+        "role": "agent",
+        "text": "Understood. So, you offer 25 milligram, 50 milligram, and 75 milligram paracetamol in tablet and capsule forms, with a minimum order quantity of five for each. Can you provide details on your pricing tiers for these products, especially for bulk purchases?"
+      },
+      {
+        "role": "user",
+        "text": "25 milligrams is three dollars 50 milligrams is six dollars 75 milligrams is seven dollars so you will make I can help you make a lot of discount"
+      },
+      {
+        "role": "agent",
+        "text": "Thank you for the pricing information. When you mention \"a lot of discount,\" could you elaborate on your bulk pricing or discount options for larger orders?"
+      },
+      {
+        "role": "user",
+        "text": "I cannot provide this right now I need to go have a good day goodbye"
+      },
+      {
+        "role": "agent",
+        "text": "Thank you for your time. Goodbye."
+      }
+    ],
+    "total_messages": 11
+  }
+]
