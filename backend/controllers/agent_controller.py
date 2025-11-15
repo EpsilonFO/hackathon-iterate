@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from backend.services.elevenlabs_agent_service import call_agent
 from backend.services.transcript_parser_service import TranscriptParserService
 
 load_dotenv()
@@ -57,34 +58,8 @@ async def start_conversation(request: StartConversationRequest):
     try:
         # Launch the agent conversation
         supplier_name = request.supplier_name or "Inconnu"
-        # result = call_agent(agent_id, api_key=api_key, supplier_name=supplier_name)
-        result = {
-            "conversation_id": "20251115_211355",
-            "supplier_name": "Inconnu",
-            "agent_id": "agent_5401ka49jhknfwcraz1c3jgwpf7a",
-            "timestamp": "2025-11-15T21:13:55.999015",
-            "messages": [
-                {
-                    "role": "agent",
-                    "text": "Hey there, I'm Alexis, the assistant of the pharmacy. Who's there ?",
-                },
-                {
-                    "role": "user",
-                    "text": "The assistant of the pharmacy. Who's there? Hello. I have a new product. It's dentifrice. It costs five euros and it takes two days to get delivered.",
-                },
-                {"role": "agent", "text": "Hello! Thanks for..."},
-                {"role": "user", "text": "Oh, thanks for reaching out."},
-                {"role": "agent", "text": "Thanks for reaching out with..."},
-                {"role": "user", "text": "For reaching out with that offer."},
-                {
-                    "role": "agent",
-                    "text": "Okay, so dentifrice at five euros with two day delivery. Let me ask you a few quick questions to evaluate this properly. First, what's the wholesale price per unit, and is there a minimum order quantity I need to meet? Also, do you offer any bulk discounts or promotional pricing for larger orders?",
-                },
-                {"role": "user", "text": "No, goodbye."},
-                {"role": "agent", "text": "Goodbye!"},
-            ],
-            "total_messages": 9,
-        }
+        result = call_agent(agent_id, api_key=api_key, supplier_name=supplier_name)
+
         # Parse the conversation - pass the full result dict, not just messages
         _ = parser.parse_and_update_csv(result, supplier_name, save=True)
 
