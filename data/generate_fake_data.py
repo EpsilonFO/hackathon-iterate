@@ -4,6 +4,7 @@ Generates:
 - Fournisseur (Suppliers)
 - In store products
 - Available products (can have multiple suppliers per product)
+- Orders (Customer orders to suppliers)
 """
 
 import random
@@ -237,6 +238,66 @@ def generate_available_products(
     return pd.DataFrame(available_products)
 
 
+# Generate Orders
+def generate_orders(available_products_df, n=100):
+    """Generate fake order data.
+    
+    Args:
+        available_products_df: DataFrame of available products
+        n: Number of orders to generate
+    
+    Returns:
+        DataFrame with columns: order_id, product_name, quantity, fournisseur_id, 
+                               estimated_time_arrival, time_of_arrival, order_date
+    """
+    orders = []
+    
+    for i in range(n):
+        # Select a random product from available products
+        product_entry = available_products_df.sample(1).iloc[0]
+        
+        # Generate order ID
+        order_id = f"order_{uuid.uuid4()}"
+        
+        # Quantity between 10 and 500 units
+        quantity = random.randint(10, 500)
+        
+        # Order date between 1 and 180 days ago
+        days_ago = random.randint(1, 180)
+        order_date = datetime.now() - timedelta(days=days_ago)
+        
+        # Estimated delivery time from the product's delivery_time (convert to int)
+        estimated_delivery_days = int(product_entry['delivery_time'])
+        estimated_time_arrival = order_date + timedelta(days=estimated_delivery_days)
+        
+        # Time of arrival: 
+        # - 70% of orders have arrived (time_of_arrival is filled)
+        # - 30% are still pending (time_of_arrival is None/NaT)
+        # For delivered orders, actual arrival can be early (-2 days) or late (+5 days)
+        if random.random() < 0.7 and order_date < datetime.now() - timedelta(days=estimated_delivery_days):
+            # Order has been delivered
+            delay = random.randint(-2, 5)  # Can be early or late
+            time_of_arrival = estimated_time_arrival + timedelta(days=delay)
+            # Make sure arrival is not in the future
+            if time_of_arrival > datetime.now():
+                time_of_arrival = datetime.now() - timedelta(days=random.randint(1, 3))
+        else:
+            # Order is still pending
+            time_of_arrival = None
+        
+        orders.append({
+            'order_id': order_id,
+            'product_name': product_entry['name'],
+            'quantity': quantity,
+            'fournisseur_id': product_entry['fournisseur'],
+            'estimated_time_arrival': estimated_time_arrival.strftime('%Y-%m-%d %H:%M:%S'),
+            'time_of_arrival': time_of_arrival.strftime('%Y-%m-%d %H:%M:%S') if time_of_arrival else None,
+            'order_date': order_date.strftime('%Y-%m-%d %H:%M:%S')
+        })
+    
+    return pd.DataFrame(orders)
+
+
 # Main execution
 if __name__ == "__main__":
     print("Generating fake datasets...")
@@ -310,16 +371,22 @@ if __name__ == "__main__":
     # Generate in_store_products as a subset of available_products
     # Each product name appears only once with one supplier, price matches available_products
     in_store_products = generate_in_store_products(available_products, 200)
+    
+    # Generate orders based on available products
+    orders = generate_orders(available_products, 100)
 
     # Save to CSV files
     fournisseurs.to_csv("fournisseur.csv", index=False)
     in_store_products.to_csv("in_store_product.csv", index=False)
     available_products.to_csv("available_product.csv", index=False)
+    orders.to_csv("orders.csv", index=False)
 
     print(f"✓ Generated {len(fournisseurs)} suppliers")
     print(f"✓ Generated {len(in_store_products)} in-store products")
     print(f"✓ Generated {len(available_products)} available product entries")
+    print(f"✓ Generated {len(orders)} orders")
     print("\nFiles created:")
     print("  - fournisseur.csv")
     print("  - in_store_product.csv")
     print("  - available_product.csv")
+    print("  - orders.csv")
