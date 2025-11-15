@@ -37,7 +37,7 @@ dev: check-frontend
 	@echo "Press Ctrl+C to stop both servers"
 	@echo ""
 	@trap 'kill 0' INT TERM EXIT; \
-	uvicorn backend.api.main:app --reload --port 8000 & \
+	(cd backend && source .venv/bin/activate &&  cd .. && uvicorn backend.api.main:app --reload --port 8000) & \
 	(cd frontend && npm run dev) & \
 	wait
 
@@ -52,5 +52,5 @@ dev-backend:
 	@echo "Starting backend..."
 	@echo "Backend will run on http://localhost:8000"
 	@echo "API docs available at http://localhost:8000/docs"
-	@uvicorn backend.api.main:app --reload --port 8000
+	@cd backend && source .venv/bin/activate &&  cd .. && uvicorn backend.api.main:app --reload --port 8000
 
