@@ -199,7 +199,10 @@ class TranscriptParserService:
         """
         # Normalize transcript to string format
         normalized_transcript = self._normalize_transcript(transcript)
+        print(normalized_transcript)
+
         prompt = self._build_prompt(normalized_transcript, supplier_name)
+        print(prompt)
 
         try:
             message = self.client.messages.create(
@@ -210,10 +213,10 @@ class TranscriptParserService:
 
             # Extract the response text
             response_text = message.content[0].text
-
+            print(response_text)
             # Parse the structured response
             result = self._parse_claude_response(response_text, supplier_name)
-
+            print(result)
             return result
 
         except Exception as e:

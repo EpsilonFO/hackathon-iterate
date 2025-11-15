@@ -1,0 +1,21 @@
+{
+  "conversation_id": "20251115_203105",
+  "supplier_name": "Inconnu",
+  "agent_id": "agent_5401ka49jhknfwcraz1c3jgwpf7a",
+  "timestamp": "2025-11-15T20:31:05.291459",
+  "messages": [
+    {
+      "role": "agent",
+      "text": "Hey there, I'm Alexis, the assistant of the pharmacy. Who's there ?"
+    },
+    {
+      "role": "user",
+      "text": "Pharmacy, who's there? Goodbye."
+    },
+    {
+      "role": "agent",
+      "text": "Goodbye!"
+    }
+  ],
+  "total_messages": 3
+}
