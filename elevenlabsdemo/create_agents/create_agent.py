@@ -1,6 +1,6 @@
 from elevenlabs import ElevenLabs
 from dotenv import load_dotenv
-from elevenlabsdemo.create_agents.systprompt import SYSTEM_PROMPT
+from elevenlabsdemo.create_agents.systprompt import SYSTEM_PROMPT_BUY_SEARCH_NEW_PRICES
 
 import os
 
@@ -14,7 +14,7 @@ agent = client.conversational_ai.agents.update(
     conversation_config={
         "agent": {
             "prompt": {
-                "prompt": SYSTEM_PROMPT,
+                "prompt": SYSTEM_PROMPT_BUY_SEARCH_NEW_PRICES,
                 "llm": "claude-sonnet-4-5"
             },
             "first_message": "Hey there, I'm Alexis, the assistant of the pharmacy. Who's there ?",
