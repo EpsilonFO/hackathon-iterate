@@ -167,31 +167,26 @@ def capture_agent_message(text: str, conversation):
         exit(0)
 
 
-def save_transcript(transcript_data: dict, filename: str = "transcripts.json"):
-    """Append the transcript to a single JSON file with all conversations."""
-    # Load existing transcripts if file exists
-    if os.path.exists(filename):
-        try:
-            with open(filename, 'r') as f:
-                all_transcripts = json.load(f)
-                # Ensure it's a list
-                if not isinstance(all_transcripts, list):
-                    all_transcripts = [all_transcripts]
-        except json.JSONDecodeError:
-            # If file is corrupted, start fresh
-            all_transcripts = []
-    else:
-        all_transcripts = []
+def save_transcript(transcript_data: dict, filename: str = None):
+    """Save the transcript to a JSON file in the transcripts folder."""
+    # Create transcripts folder if it doesn't exist
+    os.makedirs("transcripts", exist_ok=True)
     
-    # Add new transcript
-    all_transcripts.append(transcript_data)
+    if filename is None:
+        # Use conversation_id from ElevenLabs (format: conv_xxxxx)
+        conversation_id = transcript_data.get("conversation_id", None)
+        
+        if conversation_id and conversation_id != "unknown":
+            filename = f"transcripts/{conversation_id}.json"
+        else:
+            # Fallback to timestamp if no conversation_id
+            session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"transcripts/transcript_{session_id}.json"
     
-    # Save back to file
     with open(filename, 'w') as f:
-        json.dump(all_transcripts, f, indent=2, default=str)
+        json.dump(transcript_data, f, indent=2, default=str)
     
-    print(f"\n✓ Transcript appended to {filename}")
-    print(f"✓ Total conversations in file: {len(all_transcripts)}")
+    print(f"\n✓ Transcript saved to {filename}")
     return filename
 
 
@@ -199,8 +194,10 @@ def save_transcript_on_exit():
     """Save transcript when interrupted"""
     global messages
     if messages:
+        # Generate a session ID based on timestamp
+        session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         result = {
-            "conversation_id": "interrupted",
+            "conversation_id": session_id,
             "agent_id": os.getenv("AGENT_ID"),
             "timestamp": datetime.now().isoformat(),
             "messages": messages,
