@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { Search, AlertTriangle, TrendingDown, Phone, TrendingUp, Package, Clock, RefreshCw } from "lucide-react";
+import { Search, AlertTriangle, TrendingDown, Phone, TrendingUp, Package, Clock, RefreshCw, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 // Supplier options with prices and delivery times
@@ -147,15 +147,68 @@ const products = [
 
 const InventoryOrders = () => {
   const { toast } = useToast();
-  const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; product: any | null }>({ open: false, product: null });
-  const [createPODialog, setCreatePODialog] = useState<{ open: boolean; product: any | null }>({ open: false, product: null });
-  const [switchSupplierDialog, setSwitchSupplierDialog] = useState<{ open: boolean; product: any | null }>({ open: false, product: null });
+  const [products, setProducts] = useState<InventoryProduct[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<ActivePurchaseOrder[]>([]);
+  const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
+  const [createPODialog, setCreatePODialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
+  const [switchSupplierDialog, setSwitchSupplierDialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
   const [poForm, setPOForm] = useState({
     quantity: "",
-    supplier: "",
+    supplier_id: "",
     notes: "",
-    urgency: "normal"
+    urgency: "normal" as "urgent" | "normal" | "low"
   });
+
+  // Fetch products and purchase orders on mount
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  /**
+   * Load inventory data (products and orders) from API
+   */
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [productsResponse, ordersResponse] = await Promise.all([
+        productsApi.getInStoreProducts(),
+        productsApi.getOrders()
+      ]);
+      setProducts(productsResponse.products);
+      setPurchaseOrders(ordersResponse.orders);
+    } catch (error) {
+      toast({
+        title: "Error loading data",
+        description: error instanceof Error ? error.message : "Failed to load inventory data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Load supplier options for a product from API
+   */
+  const loadSupplierOptions = async (productId: string) => {
+    try {
+      setLoadingSuppliers(true);
+      const response = await productsApi.getProductSuppliers(productId);
+      setSupplierOptions(response.suppliers);
+    } catch (error) {
+      toast({
+        title: "Error loading suppliers",
+        description: error instanceof Error ? error.message : "Failed to load supplier options",
+        variant: "destructive",
+      });
+      setSupplierOptions([]);
+    } finally {
+      setLoadingSuppliers(false);
+    }
+  };
 
   const handleCheckAvailability = (productName: string) => {
     toast({
@@ -164,28 +217,34 @@ const InventoryOrders = () => {
     });
   };
 
-  const handleViewDetails = (product: any) => {
+  const handleViewDetails = (product: InventoryProduct) => {
     setDetailsDialog({ open: true, product });
   };
 
-  const handleCreatePO = (product: any) => {
-    const suggestedQty = Math.ceil(product.weeklyUse * 4);
+  const handleCreatePO = async (product: InventoryProduct) => {
+    const suggestedQty = Math.ceil(product.weekly_use * 4);
     setPOForm({
       quantity: suggestedQty.toString(),
-      supplier: product.supplier,
+      supplier_id: product.supplier_id,
       notes: "",
       urgency: product.status === "critical" ? "urgent" : "normal"
     });
     setCreatePODialog({ open: true, product });
+    
+    // Load supplier options for this product
+    await loadSupplierOptions(product.id);
   };
 
   const handleSubmitPO = () => {
     toast({
       title: "Purchase Order Created",
-      description: `PO created for ${createPODialog.product?.name} - ${poForm.quantity} units from ${poForm.supplier}`,
+      description: `PO created for ${createPODialog.product?.name} - ${poForm.quantity} units`,
     });
     setCreatePODialog({ open: false, product: null });
-    setPOForm({ quantity: "", supplier: "", notes: "", urgency: "normal" });
+    setPOForm({ quantity: "", supplier_id: "", notes: "", urgency: "normal" });
+    setSupplierOptions([]);
+    // Reload orders
+    loadData();
   };
 
   const handleTrackPO = (poNumber: string) => {
@@ -195,17 +254,30 @@ const InventoryOrders = () => {
     });
   };
 
-  const handleSwitchSupplier = (product: any) => {
+  const handleSwitchSupplier = async (product: InventoryProduct) => {
     setSwitchSupplierDialog({ open: true, product });
+    
+    // Load supplier options for this product
+    await loadSupplierOptions(product.id);
   };
 
-  const handleSelectSupplier = (supplierName: string) => {
+  const handleSelectSupplier = (supplierId: string, supplierName: string) => {
     toast({
       title: "Supplier Switched",
       description: `${switchSupplierDialog.product?.name} supplier changed to ${supplierName}`,
     });
     setSwitchSupplierDialog({ open: false, product: null });
+    setSupplierOptions([]);
+    // In a real app, you would update the product's supplier via API
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -219,13 +291,21 @@ const InventoryOrders = () => {
               className="pl-10"
             />
           </div>
-          <Button variant="outline">Filter</Button>
+          <Button variant="outline" onClick={loadData}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
       </Card>
 
       {/* Product List */}
       <div className="space-y-4">
-        {products.map((product) => (
+        {products.length === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground">No products found</p>
+          </Card>
+        ) : (
+          products.map((product) => (
           <Card key={product.sku} className="p-6 hover:shadow-lg transition-shadow">
             <div className="flex items-start gap-4">
               {/* Product Image Placeholder */}
@@ -315,54 +395,44 @@ const InventoryOrders = () => {
               </div>
             </div>
           </Card>
-        ))}
+          ))
+        )}
       </div>
 
       {/* Active Purchase Orders */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold text-foreground mb-4">Active Purchase Orders</h3>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
-                <span className="font-mono text-sm font-medium text-foreground">PO-3421</span>
-                <Badge variant="destructive">Delayed</Badge>
-                <span className="text-sm text-muted-foreground">BioMed Labs</span>
+        {purchaseOrders.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No active purchase orders</p>
+        ) : (
+          <div className="space-y-3">
+            {purchaseOrders.map((order) => (
+              <div key={order.order_id} className="flex items-center justify-between p-4 rounded-lg border border-border">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="font-mono text-sm font-medium text-foreground">{order.order_id}</span>
+                    <Badge 
+                      variant={order.status === "delayed" ? "destructive" : order.status === "on_track" ? "default" : "secondary"}
+                      className={order.status === "on_track" ? "bg-success text-success-foreground" : order.status === "pending" ? "bg-warning text-warning-foreground" : ""}
+                    >
+                      {order.status === "delayed" ? "Delayed" : order.status === "on_track" ? "On Track" : "Pending"}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">{order.supplier_name}</span>
+                  </div>
+                  <p className="text-sm text-foreground">{order.product_name} - {order.quantity} units</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {order.actual_delivery 
+                      ? `Delivered: ${new Date(order.actual_delivery).toLocaleDateString()}`
+                      : order.estimated_delivery
+                        ? `Expected: ${new Date(order.estimated_delivery).toLocaleDateString()}`
+                        : "Missing ETA confirmation"}
+                  </p>
+                </div>
+                <Button onClick={() => handleTrackPO(order.order_id)} size="sm" variant="outline">Track</Button>
               </div>
-              <p className="text-sm text-foreground">Amoxicillin 500mg - 200 units</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Expected: Feb 10 → Revised: Feb 15 (+5 days)
-              </p>
-            </div>
-            <Button onClick={() => handleTrackPO("PO-3421")} size="sm" variant="outline">Track</Button>
+            ))}
           </div>
-
-          <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
-                <span className="font-mono text-sm font-medium text-foreground">PO-3427</span>
-                <Badge className="bg-success text-success-foreground">On Track</Badge>
-                <span className="text-sm text-muted-foreground">Medisupply SAS</span>
-              </div>
-              <p className="text-sm text-foreground">Paracetamol 500mg - 300 units</p>
-              <p className="text-xs text-muted-foreground mt-1">Expected: Feb 11 (in 4 days)</p>
-            </div>
-            <Button onClick={() => handleTrackPO("PO-3427")} size="sm" variant="outline">Track</Button>
-          </div>
-
-          <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
-                <span className="font-mono text-sm font-medium text-foreground">PO-3431</span>
-                <Badge className="bg-warning text-warning-foreground">Pending</Badge>
-                <span className="text-sm text-muted-foreground">PharmaCore Europe</span>
-              </div>
-              <p className="text-sm text-foreground">Ibuprofen 400mg - 500 units</p>
-              <p className="text-xs text-muted-foreground mt-1">Missing ETA confirmation</p>
-            </div>
-            <Button onClick={() => handleTrackPO("PO-3431")} size="sm" variant="outline">Track</Button>
-          </div>
-        </div>
+        )}
       </Card>
 
       {/* Product Details Dialog */}
@@ -386,7 +456,7 @@ const InventoryOrders = () => {
                 <Card className="p-4">
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">Weekly Consumption</p>
-                    <p className="text-3xl font-bold">{detailsDialog.product.weeklyUse}</p>
+                    <p className="text-3xl font-bold">{detailsDialog.product.weekly_use}</p>
                     <div className="flex items-center gap-2 text-sm text-warning">
                       <TrendingUp className="h-4 w-4" />
                       <span>High demand</span>
@@ -402,10 +472,10 @@ const InventoryOrders = () => {
                   <div>
                     <p className="font-semibold">Projected Stockout</p>
                     <p className="text-sm text-muted-foreground">
-                      Expected on {detailsDialog.product.stockoutDate}
+                      Expected on {detailsDialog.product.stockout_date}
                     </p>
                     <p className="text-sm mt-2">
-                      Recommended reorder quantity: <span className="font-bold">{Math.ceil(detailsDialog.product.weeklyUse * 4)} units</span> (4 weeks supply)
+                      Recommended reorder quantity: <span className="font-bold">{Math.ceil(detailsDialog.product.weekly_use * 4)} units</span> (4 weeks supply)
                     </p>
                   </div>
                 </div>
@@ -474,7 +544,7 @@ const InventoryOrders = () => {
                 <Card className="p-4">
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">Recommended Order</p>
-                    <p className="text-3xl font-bold">{Math.ceil(createPODialog.product.weeklyUse * 4)}</p>
+                    <p className="text-3xl font-bold">{Math.ceil(createPODialog.product.weekly_use * 4)}</p>
                     <div className="flex items-center gap-2 text-sm">
                       <Package className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">4 weeks supply</span>
@@ -491,7 +561,7 @@ const InventoryOrders = () => {
                     <div>
                       <p className="font-semibold">Critical Stock Level</p>
                       <p className="text-sm text-muted-foreground">
-                        Expected stockout: {createPODialog.product.stockoutDate}
+                        Expected stockout: {createPODialog.product.stockout_date}
                       </p>
                     </div>
                   </div>
@@ -513,42 +583,38 @@ const InventoryOrders = () => {
                         placeholder="Enter quantity"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Recommended: {Math.ceil(createPODialog.product.weeklyUse * 4)} units based on consumption rate
+                        Recommended: {Math.ceil(createPODialog.product.weekly_use * 4)} units based on consumption rate
                       </p>
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="supplier">Supplier *</Label>
-                      <Select value={poForm.supplier} onValueChange={(value) => setPOForm({ ...poForm, supplier: value })}>
+                      <Select value={poForm.supplier_id} onValueChange={(value) => setPOForm({ ...poForm, supplier_id: value })}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select supplier" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Medisupply SAS">
-                            <div className="flex items-center justify-between w-full">
-                              <span>Medisupply SAS</span>
-                              <span className="text-xs text-muted-foreground ml-4">3-5 days • €4.20</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="PharmaCore Europe">
-                            <div className="flex items-center justify-between w-full">
-                              <span>PharmaCore Europe</span>
-                              <span className="text-xs text-muted-foreground ml-4">2-3 days • €4.50</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="BioMed Labs">
-                            <div className="flex items-center justify-between w-full">
-                              <span>BioMed Labs</span>
-                              <span className="text-xs text-muted-foreground ml-4">5-7 days • €3.90</span>
-                            </div>
-                          </SelectItem>
+                          {supplierOptions.length > 0 ? (
+                            supplierOptions.map((supplier) => (
+                              <SelectItem key={supplier.id} value={supplier.id}>
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{supplier.name}</span>
+                                  <span className="text-xs text-muted-foreground ml-4">{supplier.delivery_time} • €{supplier.price.toFixed(2)}</span>
+                                </div>
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value={createPODialog.product.supplier_id} disabled>
+                              {createPODialog.product.supplier}
+                            </SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="urgency">Priority Level</Label>
-                      <Select value={poForm.urgency} onValueChange={(value) => setPOForm({ ...poForm, urgency: value })}>
+                      <Select value={poForm.urgency} onValueChange={(value) => setPOForm({ ...poForm, urgency: value as "urgent" | "normal" | "low" })}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -604,11 +670,15 @@ const InventoryOrders = () => {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Unit Price</span>
-                      <span className="font-medium">€4.20</span>
+                      <span className="font-medium">
+                        €{supplierOptions.find(s => s.id === poForm.supplier_id)?.price.toFixed(2) || createPODialog.product.price.toFixed(2)}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Supplier</span>
-                      <span className="font-medium">{poForm.supplier || "—"}</span>
+                      <span className="font-medium">
+                        {supplierOptions.find(s => s.id === poForm.supplier_id)?.name || createPODialog.product.supplier || "—"}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Priority</span>
@@ -620,7 +690,9 @@ const InventoryOrders = () => {
                     <div className="flex justify-between items-center">
                       <span className="text-base font-semibold">Total Cost</span>
                       <span className="text-2xl font-bold">
-                        €{poForm.quantity ? (parseFloat(poForm.quantity) * 4.2).toFixed(2) : "—"}
+                        €{poForm.quantity && poForm.supplier_id 
+                          ? (parseFloat(poForm.quantity) * (supplierOptions.find(s => s.id === poForm.supplier_id)?.price || createPODialog.product.price)).toFixed(2) 
+                          : "—"}
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
@@ -636,7 +708,7 @@ const InventoryOrders = () => {
             <Button variant="outline" onClick={() => setCreatePODialog({ open: false, product: null })}>
               Cancel
             </Button>
-            <Button onClick={handleSubmitPO} disabled={!poForm.quantity || !poForm.supplier}>
+            <Button onClick={handleSubmitPO} disabled={!poForm.quantity || !poForm.supplier_id}>
               Validate & Create Order
             </Button>
           </DialogFooter>
@@ -659,62 +731,71 @@ const InventoryOrders = () => {
                 <p className="font-semibold">{switchSupplierDialog.product.supplier}</p>
               </div>
               
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Available Suppliers</p>
-                {supplierOptions.map((supplier) => {
-                  const price = supplier.prices[switchSupplierDialog.product.sku as keyof typeof supplier.prices];
-                  const isCurrentSupplier = supplier.name === switchSupplierDialog.product.supplier;
-                  
-                  return (
-                    <Card 
-                      key={supplier.name} 
-                      className={`p-4 hover:shadow-md transition-shadow ${isCurrentSupplier ? 'border-primary bg-primary/5' : ''}`}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold">{supplier.name}</h4>
-                            {isCurrentSupplier && (
-                              <Badge variant="outline" className="text-xs">Current</Badge>
-                            )}
-                          </div>
-                          
-                          <div className="grid grid-cols-3 gap-4 text-sm">
-                            <div>
-                              <p className="text-muted-foreground">Unit Price</p>
-                              <p className="font-semibold text-lg">€{price.toFixed(2)}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Delivery Time</p>
-                              <p className="font-medium">{supplier.deliveryTime}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Rating</p>
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">{supplier.rating}%</span>
-                                <Badge 
-                                  variant={supplier.rating >= 90 ? "default" : supplier.rating >= 75 ? "secondary" : "destructive"}
-                                  className="text-xs"
-                                >
-                                  {supplier.rating >= 90 ? "Excellent" : supplier.rating >= 75 ? "Good" : "Fair"}
-                                </Badge>
+              {loadingSuppliers ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Available Suppliers</p>
+                  {supplierOptions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No alternative suppliers found</p>
+                  ) : (
+                    supplierOptions.map((supplier) => {
+                      const isCurrentSupplier = supplier.id === switchSupplierDialog.product?.supplier_id;
+                      
+                      return (
+                        <Card 
+                          key={supplier.id} 
+                          className={`p-4 hover:shadow-md transition-shadow ${isCurrentSupplier ? 'border-primary bg-primary/5' : ''}`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-semibold">{supplier.name}</h4>
+                                {isCurrentSupplier && (
+                                  <Badge variant="outline" className="text-xs">Current</Badge>
+                                )}
+                              </div>
+                              
+                              <div className="grid grid-cols-3 gap-4 text-sm">
+                                <div>
+                                  <p className="text-muted-foreground">Unit Price</p>
+                                  <p className="font-semibold text-lg">€{supplier.price.toFixed(2)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Delivery Time</p>
+                                  <p className="font-medium">{supplier.delivery_time}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Rating</p>
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-medium">{supplier.rating}%</span>
+                                    <Badge 
+                                      variant={supplier.rating >= 90 ? "default" : supplier.rating >= 75 ? "secondary" : "destructive"}
+                                      className="text-xs"
+                                    >
+                                      {supplier.rating >= 90 ? "Excellent" : supplier.rating >= 75 ? "Good" : "Fair"}
+                                    </Badge>
+                                  </div>
+                                </div>
                               </div>
                             </div>
+                            
+                            <Button
+                              size="sm"
+                              disabled={isCurrentSupplier}
+                              onClick={() => handleSelectSupplier(supplier.id, supplier.name)}
+                            >
+                              {isCurrentSupplier ? "Selected" : "Select"}
+                            </Button>
                           </div>
-                        </div>
-                        
-                        <Button
-                          size="sm"
-                          disabled={isCurrentSupplier}
-                          onClick={() => handleSelectSupplier(supplier.name)}
-                        >
-                          {isCurrentSupplier ? "Selected" : "Select"}
-                        </Button>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
+                        </Card>
+                      );
+                    })
+                  )}
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>

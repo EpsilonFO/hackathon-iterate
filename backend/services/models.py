@@ -1,6 +1,6 @@
 """Pydantic models for data structures."""
 
-from typing import List, Optional
+from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -108,8 +108,9 @@ class Order(BaseModel):
     quantity: int = Field(ge=1, description="Quantity ordered")
     fournisseur_id: str
     estimated_time_arrival: str
-    time_of_arrival: Optional[str] = Field(None, description="Actual arrival time, None if not yet delivered")
+    time_of_arrival: str | None = Field(
+        default=None, description="Actual arrival time, None if not yet delivered"
+    )
     order_date: str
-
     new_price: float | None = None
     new_delivery_time: int | None = None

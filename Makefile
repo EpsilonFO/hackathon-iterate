@@ -18,7 +18,7 @@ install: install-backend install-frontend
 # Install frontend dependencies
 install-frontend:
 	@echo "Installing frontend dependencies..."
-	@cd frontend && npm install
+	@cd frontend-rayan && npm install
 
 # Install backend dependencies
 install-backend:
@@ -37,20 +37,20 @@ dev: check-frontend
 	@echo "Press Ctrl+C to stop both servers"
 	@echo ""
 	@trap 'kill 0' INT TERM EXIT; \
-	uvicorn backend.api.main:app --reload --port 8000 & \
-	(cd frontend && npm run dev) & \
+	(cd backend && source .venv/bin/activate &&  cd .. && uvicorn backend.api.main:app --reload --port 8000) & \
+	(cd frontend-rayan && npm run dev) & \
 	wait
 
 # Start only the frontend
 dev-frontend: check-frontend
 	@echo "Starting frontend..."
 	@echo "Frontend will run on http://localhost:3000"
-	@cd frontend && npm run dev
+	@cd frontend-rayan && npm run dev
 
 # Start only the backend
 dev-backend:
 	@echo "Starting backend..."
 	@echo "Backend will run on http://localhost:8000"
 	@echo "API docs available at http://localhost:8000/docs"
-	@uvicorn backend.api.main:app --reload --port 8000
+	@cd backend && source .venv/bin/activate &&  cd .. && uvicorn backend.api.main:app --reload --port 8000
 
