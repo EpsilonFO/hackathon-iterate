@@ -507,16 +507,12 @@ Réponds UNIQUEMENT avec le JSON, sans texte additionnel."""
         """
         # Parse the conversation
         parsed_updates = self.parse_conversation(transcript, supplier_name)
-        print(f"Parsed updates: {parsed_updates}")
         # Convert to ModifiedProductInformation format
         modified_products = self.parse_to_modified_products(parsed_updates)
-        print(f"Modified products: {modified_products}")
         # Prepare product information (match IDs)
         self.prepare_product_information(modified_products)
-        print(f"Prepared product information: {modified_products}")
         # Update product information
         self.update_product_information(modified_products)
-        print(f"Updated product information: {modified_products}")
         # Save to CSV if requested
         if save:
             self.save_to_csv()
