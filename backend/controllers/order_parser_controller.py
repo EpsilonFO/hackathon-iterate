@@ -1,11 +1,11 @@
 """Controller for parsing phone conversation transcripts related to order deliveries."""
 
-from typing import Dict
-from pydantic import BaseModel
+from typing import Any, Dict
+
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from backend.services.order_delivery_parser_service import OrderDeliveryParser
-
 
 router = APIRouter(prefix="/order-parser", tags=["order-parser"])
 
@@ -20,7 +20,7 @@ class OrderConversationRequest(BaseModel):
 class OrderConversationResponse(BaseModel):
     """Response model for order conversation parsing."""
 
-    updates: Dict[str, Dict[str, any]]
+    updates: Dict[str, Dict[str, Any]]
     message: str
 
 
