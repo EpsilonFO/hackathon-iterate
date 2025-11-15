@@ -216,7 +216,7 @@ class TranscriptParserService:
             print(response_text)
             # Parse the structured response
             result = self._parse_claude_response(response_text, supplier_name)
-
+            print(result)
             return result
 
         except Exception as e:
