@@ -6,7 +6,7 @@ import re
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import anthropic
 import pandas as pd
@@ -59,14 +59,127 @@ class TranscriptParserService:
         self._available_products = None
         self._fournisseurs = None
 
+    def _parse_json_transcript(self, json_input: Union[str, Path, Dict]) -> Dict:
+        """
+        Parse JSON transcript from file path, JSON string, or dict.
+
+        Args:
+            json_input: Can be a file path (str or Path), JSON string, or dict
+
+        Returns:
+            Parsed JSON dictionary
+        """
+        if isinstance(json_input, dict):
+            return json_input
+        elif isinstance(json_input, (str, Path)):
+            path = Path(json_input)
+            if path.exists():
+                # It's a file path
+                with open(path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            else:
+                # Try to parse as JSON string
+                try:
+                    return json.loads(json_input)
+                except json.JSONDecodeError:
+                    raise ValueError(
+                        f"Could not parse JSON from string or file: {json_input}"
+                    )
+        else:
+            raise ValueError(
+                f"Unsupported input type for JSON transcript: {type(json_input)}"
+            )
+
+    def _json_to_transcript(self, json_data: Dict) -> str:
+        """
+        Convert JSON transcript format to a formatted text transcript.
+
+        Args:
+            json_data: Dictionary with 'messages' array containing 'role' and 'text' fields
+
+        Returns:
+            Formatted transcript string
+        """
+        if "messages" not in json_data:
+            raise ValueError("JSON transcript must contain a 'messages' field")
+
+        messages = json_data["messages"]
+        transcript_lines = []
+
+        for msg in messages:
+            role = msg.get("role", "unknown")
+            text = msg.get("text", "")
+
+            # Map roles to French labels for consistency
+            if role == "agent":
+                label = "Pharmacie"
+            elif role == "user":
+                label = "Fournisseur"
+            else:
+                label = role.capitalize()
+
+            transcript_lines.append(f"{label}: {text}")
+
+        return "\n".join(transcript_lines)
+
+    def _normalize_transcript(self, transcript: Union[str, Path, Dict]) -> str:
+        """
+        Normalize transcript input to a string format.
+
+        Args:
+            transcript: Can be a string, file path, or JSON dict/string
+
+        Returns:
+            Normalized transcript string
+        """
+        if isinstance(transcript, str):
+            # Check if it's a JSON string or file path
+            transcript_stripped = transcript.strip()
+            if transcript_stripped.startswith("{") or transcript_stripped.startswith(
+                "["
+            ):
+                # It's a JSON string
+                json_data = self._parse_json_transcript(transcript)
+                return self._json_to_transcript(json_data)
+            else:
+                # Check if it's a file path
+                path = Path(transcript)
+                if path.exists() and path.suffix == ".json":
+                    json_data = self._parse_json_transcript(path)
+                    return self._json_to_transcript(json_data)
+                else:
+                    # It's a plain text transcript
+                    return transcript
+        elif isinstance(transcript, Path):
+            # It's a file path
+            if transcript.suffix == ".json":
+                json_data = self._parse_json_transcript(transcript)
+                return self._json_to_transcript(json_data)
+            else:
+                # Read as plain text
+                with open(transcript, "r", encoding="utf-8") as f:
+                    return f.read()
+        elif isinstance(transcript, dict):
+            # It's a JSON dict
+            return self._json_to_transcript(transcript)
+        else:
+            raise ValueError(
+                f"Unsupported transcript type: {type(transcript)}. "
+                "Expected str, Path, or dict."
+            )
+
     def parse_conversation(
-        self, transcript: str, supplier_name: str
+        self, transcript: Union[str, Path, Dict], supplier_name: str
     ) -> Dict[str, Dict[str, float]]:
         """
         Parse a phone conversation transcript to extract product updates.
 
         Args:
-            transcript: The full text transcript of the phone conversation
+            transcript: The transcript can be:
+                - A plain text string
+                - A JSON string with messages array
+                - A file path (str or Path) to a JSON or text file
+                - A dictionary with 'messages' array containing 'role' and 'text' fields
             supplier_name: The name of the supplier involved in the conversation
 
         Returns:
@@ -84,7 +197,9 @@ class TranscriptParserService:
                 }
             }
         """
-        prompt = self._build_prompt(transcript, supplier_name)
+        # Normalize transcript to string format
+        normalized_transcript = self._normalize_transcript(transcript)
+        prompt = self._build_prompt(normalized_transcript, supplier_name)
 
         try:
             message = self.client.messages.create(
@@ -115,7 +230,8 @@ class TranscriptParserService:
         Returns:
             Formatted prompt string
         """
-        prompt = f"""Tu es un assistant spécialisé dans l'analyse de conversations téléphoniques entre pharmacies et fournisseurs.
+        prompt = f"""
+Tu es un assistant spécialisé dans l'analyse de conversations téléphoniques entre pharmacies et fournisseurs.
 
 Analyse la transcription suivante d'une conversation avec le fournisseur "{supplier_name}".
 
@@ -323,8 +439,8 @@ Réponds UNIQUEMENT avec le JSON, sans texte additionnel."""
                         "id": product.product_id,
                         "name": product.product_name,
                         "fournisseur": product.fournisseur_id,
-                        "price": product.new_price or 0.0,
-                        "delivery_time": product.new_delivery_time or 1,
+                        "price": product.new_price,
+                        "delivery_time": product.new_delivery_time,
                         "last_information_update": product.new_last_information_update,
                     }
                     self._available_products = pd.concat(
@@ -350,8 +466,8 @@ Réponds UNIQUEMENT avec le JSON, sans texte additionnel."""
                     "id": product_id,
                     "name": product.product_name,
                     "fournisseur": product.fournisseur_id,
-                    "price": product.new_price or 0.0,
-                    "delivery_time": product.new_delivery_time or 1,
+                    "price": product.new_price,
+                    "delivery_time": product.new_delivery_time,
                     "last_information_update": product.new_last_information_update,
                 }
                 self._available_products = pd.concat(
@@ -368,7 +484,7 @@ Réponds UNIQUEMENT avec le JSON, sans texte additionnel."""
 
     def parse_and_update_csv(
         self,
-        transcript: str,
+        transcript: Union[str, Path, Dict],
         supplier_name: str,
         save: bool = False,
     ) -> List[ModifiedProductInformation]:
@@ -378,7 +494,11 @@ Réponds UNIQUEMENT avec le JSON, sans texte additionnel."""
         This is a convenience method that combines parsing, conversion, and CSV update.
 
         Args:
-            transcript: The full text transcript of the phone conversation
+            transcript: The transcript can be:
+                - A plain text string
+                - A JSON string with messages array
+                - A file path (str or Path) to a JSON or text file
+                - A dictionary with 'messages' array containing 'role' and 'text' fields
             supplier_name: The name of the supplier involved in the conversation
             save: If True, save the updated data to CSV file
 
@@ -387,16 +507,16 @@ Réponds UNIQUEMENT avec le JSON, sans texte additionnel."""
         """
         # Parse the conversation
         parsed_updates = self.parse_conversation(transcript, supplier_name)
-
+        print(f"Parsed updates: {parsed_updates}")
         # Convert to ModifiedProductInformation format
         modified_products = self.parse_to_modified_products(parsed_updates)
-
+        print(f"Modified products: {modified_products}")
         # Prepare product information (match IDs)
         self.prepare_product_information(modified_products)
-
+        print(f"Prepared product information: {modified_products}")
         # Update product information
         self.update_product_information(modified_products)
-
+        print(f"Updated product information: {modified_products}")
         # Save to CSV if requested
         if save:
             self.save_to_csv()
