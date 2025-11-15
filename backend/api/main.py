@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.controllers.product_controller import router as product_router
 from backend.controllers.root_controller import router as root_router
 from backend.controllers.supplier_controller import router as supplier_router
+from backend.controllers.parser_controller import router as parser_router
 
 app = FastAPI(
     title="Supplier Optimization API",
@@ -26,3 +27,4 @@ app.add_middleware(
 app.include_router(root_router)
 app.include_router(supplier_router)
 app.include_router(product_router)
+app.include_router(parser_router)
