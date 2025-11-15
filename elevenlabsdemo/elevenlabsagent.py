@@ -64,16 +64,6 @@ def should_end_conversation(text: str) -> bool:
     return False
 
 def call_agent(agent_id: str, api_key: str = None):
-    """
-    Call an ElevenLabs conversational agent and return the transcript.
-    
-    Args:
-        agent_id: The ID of your ElevenLabs agent
-        api_key: Your ElevenLabs API key (or set ELEVENLABS_API_KEY env var)
-    
-    Returns:
-        dict: Conversation transcript with messages
-    """
     global messages, conversation_instance
     messages = []
     
