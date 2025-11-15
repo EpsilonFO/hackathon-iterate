@@ -1,11 +1,19 @@
 import os
 import json
 import signal
+import threading
+import time
 from datetime import datetime
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
 from elevenlabs.conversational_ai.conversation import Conversation
 from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInterface
+try:
+    from echo_cancellation_audio import EchoCancellationAudioInterface
+    ECHO_CANCELLATION_AVAILABLE = True
+except ImportError:
+    ECHO_CANCELLATION_AVAILABLE = False
+    print("⚠️  Echo cancellation not available - install dependencies or use headphones")
 
 # Load environment variables
 load_dotenv()
@@ -13,6 +21,8 @@ load_dotenv()
 # Store messages globally
 messages = []
 conversation_instance = None  # Store conversation instance globally
+agent_is_speaking = False  # Track when agent is speaking to prevent feedback
+agent_speaking_lock = threading.Lock()
 
 # Goodbye keywords to detect end of conversation
 GOODBYE_KEYWORDS = [
@@ -63,32 +73,44 @@ def should_end_conversation(text: str) -> bool:
     
     return False
 
-def call_agent(agent_id: str, api_key: str = None):
+def call_agent(agent_id: str, api_key: str = None, use_echo_cancellation: bool = True):
     """
     Call an ElevenLabs conversational agent and return the transcript.
-    
+
     Args:
         agent_id: The ID of your ElevenLabs agent
         api_key: Your ElevenLabs API key (or set ELEVENLABS_API_KEY env var)
-    
+        use_echo_cancellation: Use custom echo cancellation (for demos with speakers)
+
     Returns:
         dict: Conversation transcript with messages
     """
     global messages, conversation_instance
     messages = []
-    
+
     # Initialize client
     if api_key is None:
         api_key = os.environ.get("ELEVENLABS_API_KEY")
-    
+
     client = ElevenLabs(api_key=api_key)
-    
+
+    # Choose audio interface based on availability and preference
+    if use_echo_cancellation and ECHO_CANCELLATION_AVAILABLE:
+        print("🎯 Using Echo Cancellation Audio Interface (for speakers)")
+        audio_interface = EchoCancellationAudioInterface(
+            volume_threshold=0.02,  # Adjust sensitivity
+            silence_duration=0.8    # Wait 0.8s after agent speaks
+        )
+    else:
+        print("🎧 Using Default Audio Interface (use headphones to avoid feedback)")
+        audio_interface = DefaultAudioInterface()
+
     # Start conversation with the agent using callbacks to capture transcript
     conversation = Conversation(
         client=client,
         agent_id=agent_id,
         requires_auth=bool(api_key),
-        audio_interface=DefaultAudioInterface(),
+        audio_interface=audio_interface,
         # Callbacks to capture the conversation
         callback_agent_response=lambda response: capture_agent_message(response, conversation),
         callback_user_transcript=lambda transcript: capture_message("user", transcript),
@@ -143,8 +165,12 @@ def capture_message(role: str, text: str):
 
 def capture_agent_message(text: str, conversation):
     """Callback function to capture agent messages and detect goodbye"""
-    global messages
-    
+    global messages, agent_is_speaking
+
+    # Mark that agent is speaking (to prevent feedback loop)
+    with agent_speaking_lock:
+        agent_is_speaking = True
+
     # Capture the message
     message = {
         "role": "agent",
@@ -152,12 +178,26 @@ def capture_agent_message(text: str, conversation):
     }
     messages.append(message)
     print(f"[AGENT]: {text}")
-    
+
+    # Estimate speaking time (rough: ~150 words/min = 2.5 words/sec)
+    # Add 1.5 second buffer after agent finishes
+    word_count = len(text.split())
+    estimated_duration = (word_count / 2.5) + 1.5
+
+    # Schedule re-enabling microphone after agent finishes speaking
+    def re_enable_listening():
+        time.sleep(estimated_duration)
+        with agent_speaking_lock:
+            global agent_is_speaking
+            agent_is_speaking = False
+            print("�� Listening for your response...")
+
+    threading.Thread(target=re_enable_listening, daemon=True).start()
+
     # Check if agent said goodbye in a way that ends the conversation
     if should_end_conversation(text):
         print("\n🔔 Agent said goodbye - ending conversation...")
         # Give a brief moment for the audio to finish
-        import time
         time.sleep(2)
         try:
             conversation.end_session()
