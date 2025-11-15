@@ -2,10 +2,11 @@
 Service pour mettre à jour le CSV orders.csv avec les résultats du parser de livraison.
 """
 
-import pandas as pd
-from datetime import datetime, timedelta
-from typing import Dict, List, Tuple
 import os
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Tuple
+
+import pandas as pd
 
 
 class OrderUpdater:
@@ -23,9 +24,7 @@ class OrderUpdater:
         """
         if csv_path is None:
             # Chemin par défaut
-            csv_path = os.path.join(
-                os.path.dirname(__file__), "../../data/orders.csv"
-            )
+            csv_path = os.path.join(os.path.dirname(__file__), "../../data/orders.csv")
 
         self.csv_path = csv_path
         self.df = None
@@ -46,9 +45,12 @@ class OrderUpdater:
             raise ValueError("No data to save. Call load_csv() first.")
 
         if backup:
-            backup_path = f"{self.csv_path}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            backup_path = (
+                f"{self.csv_path}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            )
             # Copy current file to backup
             import shutil
+
             if os.path.exists(self.csv_path):
                 shutil.copy2(self.csv_path, backup_path)
                 print(f"Backup created: {backup_path}")
@@ -58,7 +60,7 @@ class OrderUpdater:
 
     def apply_updates(
         self,
-        updates: Dict[str, Dict[str, any]],
+        updates: Dict[str, Dict[str, Any]],
         fournisseur_mapping: Dict[str, str] = None,
     ) -> Tuple[List[str], List[str]]:
         """
@@ -81,7 +83,9 @@ class OrderUpdater:
         for product_supplier_key, changes in updates.items():
             try:
                 # Parser la clé "[product_name, supplier_name]"
-                if not product_supplier_key.startswith("[") or not product_supplier_key.endswith("]"):
+                if not product_supplier_key.startswith(
+                    "["
+                ) or not product_supplier_key.endswith("]"):
                     failures.append(f"Invalid key format: {product_supplier_key}")
                     continue
 
@@ -146,32 +150,36 @@ class OrderUpdater:
                             )
                         except:
                             # Si erreur, utiliser midi par défaut
-                            final_datetime = new_datetime.replace(hour=12, minute=0, second=0)
-                        
-                        self.df.loc[idx, "estimated_time_arrival"] = final_datetime.strftime(
-                            "%Y-%m-%d %H:%M:%S"
+                            final_datetime = new_datetime.replace(
+                                hour=12, minute=0, second=0
+                            )
+
+                        self.df.loc[idx, "estimated_time_arrival"] = (
+                            final_datetime.strftime("%Y-%m-%d %H:%M:%S")
                         )
-                    
+
                     updated_fields.append(f"new_date={new_date}")
 
                 elif "delay_days" in changes:
                     # Délai en jours (positif = retard, négatif = avance)
                     delay_days = changes["delay_days"]
-                    
+
                     for idx in pending_orders.index:
                         original_eta = self.df.loc[idx, "estimated_time_arrival"]
                         try:
                             original_datetime = pd.to_datetime(original_eta)
-                            new_datetime = original_datetime + timedelta(days=delay_days)
-                            self.df.loc[idx, "estimated_time_arrival"] = new_datetime.strftime(
-                                "%Y-%m-%d %H:%M:%S"
+                            new_datetime = original_datetime + timedelta(
+                                days=delay_days
+                            )
+                            self.df.loc[idx, "estimated_time_arrival"] = (
+                                new_datetime.strftime("%Y-%m-%d %H:%M:%S")
                             )
                         except Exception as e:
                             failures.append(
                                 f"Error updating order {self.df.loc[idx, 'order_id']}: {str(e)}"
                             )
                             continue
-                    
+
                     updated_fields.append(f"delay={delay_days} days")
 
                 if updated_fields:
@@ -191,7 +199,7 @@ class OrderUpdater:
 
     def preview_updates(
         self,
-        updates: Dict[str, Dict[str, any]],
+        updates: Dict[str, Dict[str, Any]],
         fournisseur_mapping: Dict[str, str] = None,
     ) -> pd.DataFrame:
         """
@@ -210,10 +218,9 @@ class OrderUpdater:
         preview_data = []
 
         for product_supplier_key, changes in updates.items():
-            if (
-                not product_supplier_key.startswith("[")
-                or not product_supplier_key.endswith("]")
-            ):
+            if not product_supplier_key.startswith(
+                "["
+            ) or not product_supplier_key.endswith("]"):
                 continue
 
             # Enlever les crochets et split sur ", "
@@ -241,7 +248,7 @@ class OrderUpdater:
 
             for _, order in pending_orders.iterrows():
                 current_eta = order["estimated_time_arrival"]
-                
+
                 # Calculer la nouvelle date
                 if "new_date" in changes:
                     new_date = changes["new_date"]
@@ -275,7 +282,8 @@ class OrderUpdater:
                     "current_eta": current_eta,
                     "new_eta": new_eta,
                     "change_type": "new_date" if "new_date" in changes else "delay",
-                    "change_value": changes.get("new_date") or changes.get("delay_days"),
+                    "change_value": changes.get("new_date")
+                    or changes.get("delay_days"),
                 }
                 preview_data.append(preview_row)
 
@@ -284,8 +292,6 @@ class OrderUpdater:
 
 # Exemple d'utilisation
 if __name__ == "__main__":
-    import json
-
     # Exemple de mises à jour du parser
     parser_updates = {
         "[Paracétamol 500mg, Pharma Depot]": {"new_date": "2025-12-20"},
