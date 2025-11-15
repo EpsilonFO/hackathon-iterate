@@ -8,7 +8,7 @@
     },
     {
       "role": "user",
-      "text": "Hmm, what kind of products do you want to get?"
+      "text": "Restocking this week, I need your advice."
     },
     {
       "role": "agent",
@@ -16,28 +16,12 @@
     },
     {
       "role": "user",
-      "text": "I'm selling a lot of..."
+      "text": "Uh, hello. Hello, what products do you currently have available for supply?"
     },
     {
       "role": "agent",
-      "text": "Could you please specify the product categories you offer? I'm interested in understanding the range of items you can supply to our pharmacy."
-    },
-    {
-      "role": "user",
-      "text": "Headache..."
-    },
-    {
-      "role": "agent",
-      "text": "Thank you. Regarding headache relief products, what specific formulations do you offer, such as tablets, capsules, or topical applications?"
-    },
-    {
-      "role": "user",
-      "text": "Do you need more capsules?"
-    },
-    {
-      "role": "agent",
-      "text": "Yes, capsules are a product type we are interested in. Could you provide details on the active ingredients, strengths, and packaging sizes for your headache relief capsules?"
+      "text": "Hello! What products do you currently have available for supply?"
     }
   ],
-  "total_messages": 9
+  "total_messages": 5
 }
