@@ -27,10 +27,21 @@ export interface InventoryProduct {
   supplier: string;
   supplier_id: string;
   currentPrice: number;
+  currentPriceSupplier: string;
   bestPrice: number;
+  bestPriceSupplier: string;
+  bestPriceSupplierId: string;
   sellPrice: number;
   currentMargin: number;
   bestMargin: number;
+  currentDeliveryTime: number | null;
+  currentDeliverySupplier: string;
+  bestDeliveryTime: number | null;
+  bestDeliverySupplier: string;
+  bestDeliverySupplierId: string;
+  marginImprovementPossible: boolean;
+  deliveryImprovementPossible: boolean;
+  dualImprovementSameSupplier: boolean;
   type: 'in-house' | 'external';
 }
 

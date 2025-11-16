@@ -19,6 +19,51 @@ const InventoryOrders = () => {
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [productTypeFilter, setProductTypeFilter] = useState<"all" | "in-house" | "external">("all");
+
+  // Helper function to round to 1 decimal place
+  const round1 = (value: number): number => Math.round(value * 10) / 10;
+
+  // Filter products based on search query and product type
+  const filteredProducts = products.filter((product) => {
+    // Filter by product type
+    if (productTypeFilter !== "all" && product.type !== productTypeFilter) {
+      return false;
+    }
+    
+    // Filter by search query
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase().trim();
+    return (
+      product.name.toLowerCase().includes(query) ||
+      product.category.toLowerCase().includes(query) ||
+      product.supplier.toLowerCase().includes(query) ||
+      product.currentPriceSupplier.toLowerCase().includes(query) ||
+      product.bestPriceSupplier.toLowerCase().includes(query)
+    );
+  });
+
+  // Sort products by improvement priority
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    // Priority order:
+    // 1. Dual improvement (same supplier has both best price and delivery)
+    // 2. Both improvements (best price and faster delivery, but different suppliers)
+    // 3. Best price only
+    // 4. Faster delivery only
+    // 5. No improvements
+    
+    const getPriority = (product: InventoryProduct): number => {
+      if (product.dualImprovementSameSupplier) return 1;
+      if (product.marginImprovementPossible && product.deliveryImprovementPossible) return 2;
+      if (product.marginImprovementPossible) return 3;
+      if (product.deliveryImprovementPossible) return 4;
+      return 5;
+    };
+    
+    return getPriority(a) - getPriority(b);
+  });
   const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
   const [createPODialog, setCreatePODialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
   const [switchSupplierDialog, setSwitchSupplierDialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
@@ -155,15 +200,53 @@ const InventoryOrders = () => {
     <div className="space-y-6">
       {/* Search and Filters */}
       <Card className="p-4">
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search products by name, SKU, or category..." 
+              placeholder="Search products by name, SKU, category, or supplier..." 
               className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground text-xl leading-none"
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
           </div>
-          <Button variant="outline">Filter</Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={productTypeFilter === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setProductTypeFilter("all")}
+            >
+              All
+            </Button>
+            <Button
+              variant={productTypeFilter === "in-house" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setProductTypeFilter("in-house")}
+            >
+              In-House
+            </Button>
+            <Button
+              variant={productTypeFilter === "external" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setProductTypeFilter("external")}
+            >
+              New Products
+            </Button>
+          </div>
+          {(searchQuery || productTypeFilter !== "all") && (
+            <div className="text-sm text-muted-foreground whitespace-nowrap">
+              {sortedProducts.length} {sortedProducts.length === 1 ? 'product' : 'products'}
+            </div>
+          )}
         </div>
       </Card>
 
@@ -177,97 +260,150 @@ const InventoryOrders = () => {
         </Card>
       ) : (
         <div className="space-y-4">
-          {products.map((product) => (
-          <Card key={product.sku} className="p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-start gap-4">
-              {/* Product Image Placeholder */}
-              <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-xs text-muted-foreground font-mono">{product.sku}</span>
+          {searchQuery && sortedProducts.length === 0 && (
+            <Card className="p-6">
+              <div className="text-center text-muted-foreground">
+                <p className="text-sm">No products found matching "{searchQuery}"</p>
+                <Button 
+                  variant="link" 
+                  className="mt-2"
+                  onClick={() => setSearchQuery("")}
+                >
+                  Clear search
+                </Button>
               </div>
-
-              {/* Product Info */}
+            </Card>
+          )}
+          {sortedProducts.map((product) => {
+            // Determine if product should be highlighted
+            const isExternal = product.type === "external";
+            const hasMarginImprovement = product.marginImprovementPossible;
+            const hasDeliveryImprovement = product.deliveryImprovementPossible;
+            const hasDualImprovement = product.dualImprovementSameSupplier;
+            
+            // Determine border color based on improvement type
+            let borderClass = "";
+            if (isExternal) {
+              borderClass = "border-l-4 border-l-blue-500";
+            } else if (hasDualImprovement) {
+              borderClass = "border-l-4 border-l-purple-500";
+            } else if (hasMarginImprovement && hasDeliveryImprovement) {
+              borderClass = "border-l-4 border-l-purple-500";
+            } else if (hasMarginImprovement) {
+              borderClass = "border-l-4 border-l-green-500";
+            } else if (hasDeliveryImprovement) {
+              borderClass = "border-l-4 border-l-orange-500";
+            }
+            
+            return (
+          <Card key={product.id} className={`p-4 hover:shadow-md transition-shadow ${borderClass}`}>
+            <div className="flex items-center gap-4">
+              {/* Product Info - Compact One Line */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-semibold text-foreground">{product.name}</h4>
-                      {product.type === "external" ? (
-                        <Badge className="bg-blue-50 text-blue-700 border-blue-300">
-                          <Package className="h-3 w-3 mr-1" />
-                          New Opportunity
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-muted/50">
-                          In-House
-                        </Badge>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h4 className="font-semibold text-foreground truncate">{product.name}</h4>
+                  {product.type === "external" ? (
+                    <Badge className="bg-blue-500 text-white text-xs">
+                      <Package className="h-3 w-3 mr-1" />
+                      New
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-muted/50 text-xs">
+                      In-House
+                    </Badge>
+                  )}
+                  {!isExternal && hasDualImprovement && (
+                    <Badge className="bg-purple-500 text-white text-xs">
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                      Better Price & Faster
+                    </Badge>
+                  )}
+                  {!isExternal && !hasDualImprovement && hasMarginImprovement && (
+                    <Badge className="bg-green-500 text-white text-xs">
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                      Better Price
+                    </Badge>
+                  )}
+                  {!isExternal && !hasDualImprovement && hasDeliveryImprovement && (
+                    <Badge className="bg-orange-500 text-white text-xs">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Faster
+                    </Badge>
+                  )}
+                </div>
+                
+                {/* Main Info Row */}
+                <div className="flex items-center gap-6 mt-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Price:</span>
+                    <span className="text-sm font-semibold">
+                      {product.type === "external" 
+                        ? `€${product.bestPrice.toFixed(2)}`
+                        : `€${product.currentPrice.toFixed(2)}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Delivery:</span>
+                    <span className="text-sm font-semibold">
+                      {product.type === "external"
+                        ? (product.bestDeliveryTime ? `${product.bestDeliveryTime}d` : 'N/A')
+                        : (product.currentDeliveryTime ? `${product.currentDeliveryTime}d` : 'N/A')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Supplier: </span>
+                    <span className="text-sm font-semibold">
+                      {product.type === "external" 
+                        ? product.bestPriceSupplier 
+                        : product.currentPriceSupplier}
+                    </span>
+                  </div>
+                  {product.type === "in-house" && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Margin:</span>
+                      <span className="text-sm font-semibold">{round1(product.currentMargin)}%</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Improvement Info - Only if exists */}
+                {(hasMarginImprovement || hasDeliveryImprovement) && (
+                  <div className="mt-2 pt-2 border-t border-border/50">
+                    <div className="flex items-center gap-4 flex-wrap text-xs">
+                      {hasMarginImprovement && (
+                        <div className="flex items-center gap-1.5">
+                          <TrendingDown className="h-3 w-3 text-green-600" />
+                          <span className="text-muted-foreground">Best price:</span>
+                          <span className="font-semibold text-green-600">€{product.bestPrice.toFixed(2)}</span>
+                          <span className="text-muted-foreground">({product.bestPriceSupplier})</span>
+                          <span className="text-green-600">Save €{(product.currentPrice - product.bestPrice).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {hasDeliveryImprovement && product.bestDeliveryTime && (
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3 w-3 text-orange-600" />
+                          <span className="text-muted-foreground">Fastest:</span>
+                          <span className="font-semibold text-orange-600">{product.bestDeliveryTime}d</span>
+                          <span className="text-muted-foreground">({product.bestDeliverySupplier})</span>
+                          <span className="text-orange-600">{product.currentDeliveryTime! - product.bestDeliveryTime}d faster</span>
+                        </div>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">{product.category}</p>
-                  </div>
-                </div>
-
-                {/* Pricing & Margin Metrics */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                  <div className="bg-primary/5 p-3 rounded-lg border border-primary/10">
-                    <p className="text-xs text-muted-foreground mb-1">Best Available Price</p>
-                    <p className="text-xl font-bold text-primary">€{product.bestPrice.toFixed(2)}</p>
-                    {product.type === "in-house" && product.bestPrice < product.currentPrice && (
-                      <p className="text-xs text-success flex items-center gap-1 mt-1">
-                        <TrendingDown className="h-3 w-3" />
-                        €{(product.currentPrice - product.bestPrice).toFixed(2)} savings
-                      </p>
-                    )}
-                  </div>
-                  <div className="bg-success/5 p-3 rounded-lg border border-success/10">
-                    <p className="text-xs text-muted-foreground mb-1">Best Margin</p>
-                    <p className="text-xl font-bold text-success">{product.bestMargin}%</p>
-                    {product.type === "in-house" && product.bestMargin > product.currentMargin && (
-                      <p className="text-xs text-success flex items-center gap-1 mt-1">
-                        <TrendingUp className="h-3 w-3" />
-                        +{product.bestMargin - product.currentMargin}% potential
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Sell Price</p>
-                    <p className="text-lg font-semibold text-foreground">€{product.sellPrice.toFixed(2)}</p>
-                    {product.type === "in-house" && (
-                      <p className="text-xs text-muted-foreground mt-1">Current: {product.currentMargin}%</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Best Supplier</p>
-                    <p className="text-sm font-medium text-foreground">{product.supplier}</p>
-                    {product.type === "external" && (
-                      <p className="text-xs text-blue-600 mt-1">High margin opportunity</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* External product info */}
-                {product.type === "external" && (
-                  <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm font-medium text-blue-900 flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4" />
-                      High-Margin Expansion Opportunity
-                    </p>
-                    <p className="text-xs text-blue-700 mt-1">
-                      New product with {product.bestMargin}% margin potential • Never purchased before
-                    </p>
                   </div>
                 )}
+              </div>
 
-                {/* Actions */}
-                <div className="flex gap-2 mt-4">
-                  <Button onClick={() => handleCheckAvailability(product.name)} size="sm" className="flex items-center gap-2">
-                    <Phone className="h-3 w-3" />
-                    Check Availability
-                  </Button>
-                </div>
+              {/* Actions */}
+              <div className="flex-shrink-0">
+                <Button onClick={() => handleCheckAvailability(product.name)} size="sm" variant="outline" className="flex items-center gap-2">
+                  <Phone className="h-3 w-3" />
+                  Check availability
+                </Button>
               </div>
             </div>
           </Card>
-          ))}
+          );
+          })}
         </div>
       )}
 

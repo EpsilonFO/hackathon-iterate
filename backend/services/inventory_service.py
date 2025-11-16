@@ -40,8 +40,12 @@ class InventoryService:
                 available_by_product_id[avail.id] = []
             available_by_product_id[avail.id].append(avail)
 
+        # Get set of in-store product names for comparison (normalized: lowercase, stripped)
+        in_store_product_names = {p.name.strip().lower() for p in in_store_products}
+
         enriched_products = []
 
+        # Process in-store products (these are "in-house")
         for product in in_store_products:
             # Get supplier info
             supplier = fournisseurs_dict.get(product.fournisseur_id)
@@ -50,19 +54,43 @@ class InventoryService:
             # Get all available options for this product (by product ID)
             available_options = available_by_product_id.get(product.id, [])
 
-            # Find best price (lowest)
+            # Find current supplier's delivery time
+            current_delivery_time = None
+            for avail in available_options:
+                if avail.fournisseur == product.fournisseur_id:
+                    current_delivery_time = avail.delivery_time
+                    break
+
+            # Find best price (lowest) and its supplier
             best_price = product.price
-            best_supplier_id = product.fournisseur_id
-            best_supplier_name = supplier_name
+            best_price_supplier_id = product.fournisseur_id
+            best_price_supplier_name = supplier_name
+            best_delivery_time = current_delivery_time
+            best_delivery_supplier_id = product.fournisseur_id
+            best_delivery_supplier_name = supplier_name
 
             if available_options:
-                best_option = min(available_options, key=lambda x: x.price)
-                if best_option.price < product.price:
-                    best_price = best_option.price
-                    best_supplier_id = best_option.fournisseur
-                    best_supplier = fournisseurs_dict.get(best_option.fournisseur)
-                    if best_supplier:
-                        best_supplier_name = best_supplier.name
+                # Find best price option
+                best_price_option = min(available_options, key=lambda x: x.price)
+                if best_price_option.price < product.price:
+                    best_price = best_price_option.price
+                    best_price_supplier = fournisseurs_dict.get(
+                        best_price_option.fournisseur
+                    )
+                    if best_price_supplier:
+                        best_price_supplier_id = best_price_option.fournisseur
+                        best_price_supplier_name = best_price_supplier.name
+
+                # Find fastest delivery option
+                fastest_option = min(available_options, key=lambda x: x.delivery_time)
+                if fastest_option.delivery_time < (current_delivery_time or 14):
+                    best_delivery_time = fastest_option.delivery_time
+                    best_delivery_supplier = fournisseurs_dict.get(
+                        fastest_option.fournisseur
+                    )
+                    if best_delivery_supplier:
+                        best_delivery_supplier_id = fastest_option.fournisseur
+                        best_delivery_supplier_name = best_delivery_supplier.name
 
             # Calculate margins (assuming a standard markup of 50% for sell price)
             # This is a simplified calculation - in real app, sell price would come from data
@@ -70,8 +98,26 @@ class InventoryService:
             current_margin = ((sell_price - product.price) / sell_price) * 100
             best_margin = ((sell_price - best_price) / sell_price) * 100
 
+            # Determine if improvements are possible
+            margin_improvement_possible = (
+                best_margin > current_margin + 0.5
+            )  # At least 0.5% improvement
+            delivery_improvement_possible = (
+                best_delivery_time is not None
+                and current_delivery_time is not None
+                and best_delivery_time < current_delivery_time
+            )
+
+            # Check if same supplier has both best price and delivery
+            dual_improvement_same_supplier = (
+                best_price_supplier_id == best_delivery_supplier_id
+                and best_price_supplier_id != product.fournisseur_id
+                and margin_improvement_possible
+                and delivery_improvement_possible
+            )
+
             # Determine product type (in-house vs external)
-            # For now, all in-store products are "in-house"
+            # Products in in_store_products are "in-house"
             product_type = "in-house"
 
             # Estimate weekly use based on stock (simplified: assume 4 weeks supply)
@@ -109,16 +155,117 @@ class InventoryService:
                     "supplier_id": product.fournisseur_id,
                     "type": product_type,
                     "currentPrice": round(product.price, 2),
+                    "currentPriceSupplier": supplier_name,
                     "bestPrice": round(best_price, 2),
+                    "bestPriceSupplier": best_price_supplier_name,
+                    "bestPriceSupplierId": best_price_supplier_id,
                     "sellPrice": round(sell_price, 2),
                     "currentMargin": round(current_margin, 1),
                     "bestMargin": round(best_margin, 1),
+                    "currentDeliveryTime": current_delivery_time,
+                    "currentDeliverySupplier": supplier_name,
+                    "bestDeliveryTime": best_delivery_time,
+                    "bestDeliverySupplier": best_delivery_supplier_name,
+                    "bestDeliverySupplierId": best_delivery_supplier_id,
+                    "marginImprovementPossible": margin_improvement_possible,
+                    "deliveryImprovementPossible": delivery_improvement_possible,
+                    "dualImprovementSameSupplier": dual_improvement_same_supplier,
                     "stock": product.stock,
                     "weeklyUse": weekly_use,
                     "stockoutDate": stockout_date,
                     "status": status,
                 }
             )
+
+        # Process available products that are NOT in store (these are "external"/new products)
+        # Group available products by name to find unique products (normalized: lowercase, stripped)
+        available_by_name = {}
+        for avail in available_products:
+            normalized_name = avail.name.strip().lower()
+            if normalized_name not in available_by_name:
+                available_by_name[normalized_name] = []
+            available_by_name[normalized_name].append(avail)
+
+        # Find products available from suppliers but not in store
+        external_count = 0
+        for normalized_name, product_entries in available_by_name.items():
+            if normalized_name not in in_store_product_names:
+                external_count += 1
+                # Get the original name from the first entry
+                product_name = product_entries[0].name
+                # This is a new product (external) - not in store yet
+                # Find best price and fastest delivery
+                best_price_option = min(product_entries, key=lambda x: x.price)
+                fastest_option = min(product_entries, key=lambda x: x.delivery_time)
+
+                best_price = best_price_option.price
+                best_price_supplier = fournisseurs_dict.get(
+                    best_price_option.fournisseur
+                )
+                best_price_supplier_name = (
+                    best_price_supplier.name
+                    if best_price_supplier
+                    else "Unknown Supplier"
+                )
+                best_price_supplier_id = best_price_option.fournisseur
+
+                best_delivery_time = fastest_option.delivery_time
+                best_delivery_supplier = fournisseurs_dict.get(
+                    fastest_option.fournisseur
+                )
+                best_delivery_supplier_name = (
+                    best_delivery_supplier.name
+                    if best_delivery_supplier
+                    else "Unknown Supplier"
+                )
+                best_delivery_supplier_id = fastest_option.fournisseur
+
+                # Use first product ID from available products for this name
+                product_id = product_entries[0].id
+
+                # Calculate margin (assuming 50% markup)
+                sell_price = best_price * 1.5
+                best_margin = ((sell_price - best_price) / sell_price) * 100
+
+                # For external products, no improvements are possible (no baseline to compare)
+                # But we can note if same supplier has both best price and delivery for reference
+                # (not used for improvement badges, just informational)
+
+                enriched_products.append(
+                    {
+                        "id": product_id,
+                        "sku": product_id[:8].upper(),
+                        "name": product_name,
+                        "category": "General",
+                        "supplier": best_price_supplier_name,  # Best supplier as default
+                        "supplier_id": best_price_supplier_id,
+                        "type": "external",  # New product, not in store
+                        "currentPrice": 0,  # Not purchased yet
+                        "currentPriceSupplier": "N/A",
+                        "bestPrice": round(best_price, 2),
+                        "bestPriceSupplier": best_price_supplier_name,
+                        "bestPriceSupplierId": best_price_supplier_id,
+                        "sellPrice": round(sell_price, 2),
+                        "currentMargin": 0,  # No current margin (not purchased)
+                        "bestMargin": round(best_margin, 1),
+                        "currentDeliveryTime": None,  # No current delivery time
+                        "currentDeliverySupplier": "N/A",
+                        "bestDeliveryTime": best_delivery_time,
+                        "bestDeliverySupplier": best_delivery_supplier_name,
+                        "bestDeliverySupplierId": best_delivery_supplier_id,
+                        "marginImprovementPossible": False,  # Can't improve if not purchased
+                        "deliveryImprovementPossible": False,  # Can't improve if not purchased
+                        "dualImprovementSameSupplier": False,  # No improvements for external products
+                        "stock": 0,  # No stock (not in store)
+                        "weeklyUse": 0,  # No usage data
+                        "stockoutDate": "N/A",
+                        "status": "healthy",  # Default status
+                    }
+                )
+
+        # Debug: print count of external products found
+        print(f"DEBUG: Found {external_count} external products (not in store)")
+        print(f"DEBUG: Total enriched products: {len(enriched_products)}")
 
         return enriched_products
 

@@ -189,10 +189,21 @@ class InventoryProduct(BaseModel):
     supplier_id: str
     type: str  # "in-house" or "external"
     currentPrice: float
+    currentPriceSupplier: str
     bestPrice: float
+    bestPriceSupplier: str
+    bestPriceSupplierId: str
     sellPrice: float
     currentMargin: float
     bestMargin: float
+    currentDeliveryTime: Optional[int] = None
+    currentDeliverySupplier: str
+    bestDeliveryTime: Optional[int] = None
+    bestDeliverySupplier: str
+    bestDeliverySupplierId: str
+    marginImprovementPossible: bool = False
+    deliveryImprovementPossible: bool = False
+    dualImprovementSameSupplier: bool = False
     stock: int
     weeklyUse: int
     stockoutDate: str
