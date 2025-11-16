@@ -21,12 +21,28 @@ export interface InventoryProduct {
   name: string;
   category: string;
   stock: number;
-  weekly_use: number;
-  stockout_date: string;
+  weeklyUse: number;
+  stockoutDate: string;
   status: 'healthy' | 'low' | 'critical';
   supplier: string;
   supplier_id: string;
-  price: number;
+  currentPrice: number;
+  currentPriceSupplier: string;
+  bestPrice: number;
+  bestPriceSupplier: string;
+  bestPriceSupplierId: string;
+  sellPrice: number;
+  currentMargin: number;
+  bestMargin: number;
+  currentDeliveryTime: number | null;
+  currentDeliverySupplier: string;
+  bestDeliveryTime: number | null;
+  bestDeliverySupplier: string;
+  bestDeliverySupplierId: string;
+  marginImprovementPossible: boolean;
+  deliveryImprovementPossible: boolean;
+  dualImprovementSameSupplier: boolean;
+  type: 'in-house' | 'external';
 }
 
 export interface ActivePurchaseOrder {
@@ -61,7 +77,7 @@ export interface PurchaseOrdersResponse {
 
 export interface SupplierOptionsResponse {
   suppliers: SupplierOption[];
-  current_supplier_id: string;
+  current_supplier_id: string | null;
 }
 
 export interface PerformanceBreakdown {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,146 +10,68 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Search, AlertTriangle, TrendingDown, Phone, TrendingUp, Package, Clock, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-// Supplier options with prices and delivery times
-const supplierOptions = [
-  {
-    name: "Medisupply SAS",
-    rating: 94,
-    deliveryTime: "2-3 days",
-    prices: {
-      "PARA500": 12.50,
-      "IBU400": 18.20,
-      "AMOX500": 24.90,
-      "FUPLU": 8.75
-    }
-  },
-  {
-    name: "PharmaCore Europe",
-    rating: 82,
-    deliveryTime: "3-5 days",
-    prices: {
-      "PARA500": 11.80,
-      "IBU400": 16.50,
-      "AMOX500": 26.40,
-      "FUPLU": 9.20
-    }
-  },
-  {
-    name: "BioMed Labs",
-    rating: 78,
-    deliveryTime: "5-7 days",
-    prices: {
-      "PARA500": 13.20,
-      "IBU400": 17.90,
-      "AMOX500": 22.50,
-      "FUPLU": 10.50
-    }
-  },
-  {
-    name: "HealthChem Imports",
-    rating: 63,
-    deliveryTime: "7-10 days",
-    prices: {
-      "PARA500": 10.90,
-      "IBU400": 15.20,
-      "AMOX500": 28.00,
-      "FUPLU": 7.95
-    }
-  },
-  {
-    name: "EuroDrug Supply",
-    rating: 85,
-    deliveryTime: "2-4 days",
-    prices: {
-      "PARA500": 12.00,
-      "IBU400": 17.50,
-      "AMOX500": 23.80,
-      "FUPLU": 8.50
-    }
-  }
-];
-
-const products = [
-  {
-    sku: "PARA500",
-    name: "Paracetamol 500mg - 16 tablets",
-    category: "Pain Relief",
-    supplier: "Medisupply SAS",
-    type: "in-house",
-    currentPrice: 12.50,
-    bestPrice: 10.90,
-    sellPrice: 18.90,
-    currentMargin: 34,
-    bestMargin: 42
-  },
-  {
-    sku: "IBU400",
-    name: "Ibuprofen 400mg - 30 tablets",
-    category: "Anti-Inflammatory",
-    supplier: "PharmaCore Europe",
-    type: "in-house",
-    currentPrice: 16.50,
-    bestPrice: 15.20,
-    sellPrice: 24.50,
-    currentMargin: 33,
-    bestMargin: 38
-  },
-  {
-    sku: "AMOX500",
-    name: "Amoxicillin 500mg - 12 capsules",
-    category: "Antibiotic",
-    supplier: "BioMed Labs",
-    type: "in-house",
-    currentPrice: 22.50,
-    bestPrice: 22.50,
-    sellPrice: 32.90,
-    currentMargin: 32,
-    bestMargin: 32
-  },
-  {
-    sku: "FUPLU",
-    name: "Flu Relief Syrup 150ml",
-    category: "Cold & Flu",
-    supplier: "Medisupply SAS",
-    type: "in-house",
-    currentPrice: 8.75,
-    bestPrice: 7.95,
-    sellPrice: 13.90,
-    currentMargin: 37,
-    bestMargin: 43
-  },
-  {
-    sku: "VITD1000",
-    name: "Vitamin D 1000IU - 60 tablets",
-    category: "Vitamins",
-    supplier: "PharmaCore Europe",
-    type: "external",
-    currentPrice: 0,
-    bestPrice: 14.20,
-    sellPrice: 22.90,
-    currentMargin: 0,
-    bestMargin: 38
-  },
-  {
-    sku: "PROB30",
-    name: "Probiotic Complex - 30 capsules",
-    category: "Supplements",
-    supplier: "BioMed Labs",
-    type: "external",
-    currentPrice: 0,
-    bestPrice: 19.80,
-    sellPrice: 34.90,
-    currentMargin: 0,
-    bestMargin: 43
-  }
-];
+import { productsApi, type InventoryProduct, type SupplierOption } from "@/lib/api";
 
 const InventoryOrders = () => {
   const { toast } = useToast();
-  const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; product: any | null }>({ open: false, product: null });
-  const [createPODialog, setCreatePODialog] = useState<{ open: boolean; product: any | null }>({ open: false, product: null });
-  const [switchSupplierDialog, setSwitchSupplierDialog] = useState<{ open: boolean; product: any | null }>({ open: false, product: null });
+  const [products, setProducts] = useState<InventoryProduct[]>([]);
+  const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [productTypeFilter, setProductTypeFilter] = useState<"all" | "in-house" | "external">("all");
+  const [displayLimit, setDisplayLimit] = useState(10);
+
+  // Helper function to round to 1 decimal place
+  const round1 = (value: number): number => Math.round(value * 10) / 10;
+
+  // Filter products based on search query and product type
+  const filteredProducts = products.filter((product) => {
+    // Filter by product type
+    if (productTypeFilter !== "all" && product.type !== productTypeFilter) {
+      return false;
+    }
+    
+    // Filter by search query
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase().trim();
+    return (
+      product.name.toLowerCase().includes(query) ||
+      product.category.toLowerCase().includes(query) ||
+      product.supplier.toLowerCase().includes(query) ||
+      product.currentPriceSupplier.toLowerCase().includes(query) ||
+      product.bestPriceSupplier.toLowerCase().includes(query)
+    );
+  });
+
+  // Sort products by improvement priority
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    // Priority order:
+    // 1. Dual improvement (same supplier has both best price and delivery)
+    // 2. Both improvements (best price and faster delivery, but different suppliers)
+    // 3. Best price only
+    // 4. Faster delivery only
+    // 5. No improvements
+    
+    const getPriority = (product: InventoryProduct): number => {
+      if (product.dualImprovementSameSupplier) return 1;
+      if (product.marginImprovementPossible && product.deliveryImprovementPossible) return 2;
+      if (product.marginImprovementPossible) return 3;
+      if (product.deliveryImprovementPossible) return 4;
+      return 5;
+    };
+    
+    return getPriority(a) - getPriority(b);
+  });
+
+  // Limit displayed products
+  const displayedProducts = sortedProducts.slice(0, displayLimit);
+  const hasMoreProducts = sortedProducts.length > displayLimit;
+  const showLessButton = displayLimit > 10 && sortedProducts.length <= displayLimit;
+  const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
+  const [createPODialog, setCreatePODialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
+  const [switchSupplierDialog, setSwitchSupplierDialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
   const [poForm, setPOForm] = useState({
     quantity: "",
     supplier: "",
@@ -191,12 +113,58 @@ const InventoryOrders = () => {
       console.error('Error starting agent:', error);
     }
   };
+  // Fetch products and orders on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const productsResponse = await productsApi.getInStoreProducts();
+        setProducts(productsResponse.products);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to load data",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [toast]);
 
-  const handleViewDetails = (product: any) => {
+  // Reset display limit when filters change
+  useEffect(() => {
+    setDisplayLimit(10);
+  }, [searchQuery, productTypeFilter]);
+
+  // Fetch suppliers when switch supplier dialog opens
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      if (switchSupplierDialog.open && switchSupplierDialog.product) {
+        try {
+          setLoadingSuppliers(true);
+          const response = await productsApi.getProductSuppliers(switchSupplierDialog.product.id);
+          setSupplierOptions(response.suppliers);
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: error instanceof Error ? error.message : "Failed to load suppliers",
+            variant: "destructive",
+          });
+        } finally {
+          setLoadingSuppliers(false);
+        }
+      }
+    };
+    fetchSuppliers();
+  }, [switchSupplierDialog.open, switchSupplierDialog.product, toast]);
+
+  const handleViewDetails = (product: InventoryProduct) => {
     setDetailsDialog({ open: true, product });
   };
 
-  const handleCreatePO = (product: any) => {
+  const handleCreatePO = (product: InventoryProduct) => {
     const suggestedQty = Math.ceil(product.weeklyUse * 4);
     setPOForm({
       quantity: suggestedQty.toString(),
@@ -216,14 +184,7 @@ const InventoryOrders = () => {
     setPOForm({ quantity: "", supplier: "", notes: "", urgency: "normal" });
   };
 
-  const handleTrackPO = (poNumber: string) => {
-    toast({
-      title: "Tracking Purchase Order",
-      description: `Opening tracking details for ${poNumber}`,
-    });
-  };
-
-  const handleSwitchSupplier = (product: any) => {
+  const handleSwitchSupplier = (product: InventoryProduct) => {
     setSwitchSupplierDialog({ open: true, product });
   };
 
@@ -239,159 +200,235 @@ const InventoryOrders = () => {
     <div className="space-y-6">
       {/* Search and Filters */}
       <Card className="p-4">
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search products by name, SKU, or category..." 
+              placeholder="Search products by name, SKU, category, or supplier..." 
               className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground text-xl leading-none"
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
           </div>
-          <Button variant="outline">Filter</Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={productTypeFilter === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setProductTypeFilter("all")}
+            >
+              All
+            </Button>
+            <Button
+              variant={productTypeFilter === "in-house" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setProductTypeFilter("in-house")}
+            >
+              In-House
+            </Button>
+            <Button
+              variant={productTypeFilter === "external" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setProductTypeFilter("external")}
+            >
+              New Products
+            </Button>
+          </div>
+          {(searchQuery || productTypeFilter !== "all") && (
+            <div className="text-sm text-muted-foreground whitespace-nowrap">
+              {sortedProducts.length} {sortedProducts.length === 1 ? 'product' : 'products'}
+            </div>
+          )}
         </div>
       </Card>
 
       {/* Product List */}
-      <div className="space-y-4">
-        {products.map((product) => (
-          <Card key={product.sku} className="p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-start gap-4">
-              {/* Product Image Placeholder */}
-              <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-xs text-muted-foreground font-mono">{product.sku}</span>
+      {loading ? (
+        <Card className="p-6">
+          <div className="flex items-center justify-center gap-2">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            <span>Loading products...</span>
+          </div>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {searchQuery && sortedProducts.length === 0 && (
+            <Card className="p-6">
+              <div className="text-center text-muted-foreground">
+                <p className="text-sm">No products found matching "{searchQuery}"</p>
+                <Button 
+                  variant="link" 
+                  className="mt-2"
+                  onClick={() => setSearchQuery("")}
+                >
+                  Clear search
+                </Button>
               </div>
-
-              {/* Product Info */}
+            </Card>
+          )}
+          {displayedProducts.map((product) => {
+            // Determine if product should be highlighted
+            const isExternal = product.type === "external";
+            const hasMarginImprovement = product.marginImprovementPossible;
+            const hasDeliveryImprovement = product.deliveryImprovementPossible;
+            const hasDualImprovement = product.dualImprovementSameSupplier;
+            
+            // Determine border color based on improvement type
+            let borderClass = "";
+            if (isExternal) {
+              borderClass = "border-l-4 border-l-blue-500";
+            } else if (hasDualImprovement) {
+              borderClass = "border-l-4 border-l-purple-500";
+            } else if (hasMarginImprovement && hasDeliveryImprovement) {
+              borderClass = "border-l-4 border-l-purple-500";
+            } else if (hasMarginImprovement) {
+              borderClass = "border-l-4 border-l-green-500";
+            } else if (hasDeliveryImprovement) {
+              borderClass = "border-l-4 border-l-orange-500";
+            }
+            
+            return (
+          <Card key={product.id} className={`p-4 hover:shadow-md transition-shadow ${borderClass}`}>
+            <div className="flex items-center gap-4">
+              {/* Product Info - Compact One Line */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-semibold text-foreground">{product.name}</h4>
-                      {product.type === "external" ? (
-                        <Badge className="bg-blue-50 text-blue-700 border-blue-300">
-                          <Package className="h-3 w-3 mr-1" />
-                          New Opportunity
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-muted/50">
-                          In-House
-                        </Badge>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h4 className="font-semibold text-foreground truncate">{product.name}</h4>
+                  {product.type === "external" ? (
+                    <Badge className="bg-blue-500 text-white text-xs">
+                      <Package className="h-3 w-3 mr-1" />
+                      New
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-muted/50 text-xs">
+                      In-House
+                    </Badge>
+                  )}
+                  {!isExternal && hasDualImprovement && (
+                    <Badge className="bg-purple-500 text-white text-xs">
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                      Better Price & Faster
+                    </Badge>
+                  )}
+                  {!isExternal && !hasDualImprovement && hasMarginImprovement && (
+                    <Badge className="bg-green-500 text-white text-xs">
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                      Better Price
+                    </Badge>
+                  )}
+                  {!isExternal && !hasDualImprovement && hasDeliveryImprovement && (
+                    <Badge className="bg-orange-500 text-white text-xs">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Faster
+                    </Badge>
+                  )}
+                </div>
+                
+                {/* Main Info Row */}
+                <div className="flex items-center gap-6 mt-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Price:</span>
+                    <span className="text-sm font-semibold">
+                      {product.type === "external" 
+                        ? `€${product.bestPrice.toFixed(2)}`
+                        : `€${product.currentPrice.toFixed(2)}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Delivery:</span>
+                    <span className="text-sm font-semibold">
+                      {product.type === "external"
+                        ? (product.bestDeliveryTime ? `${product.bestDeliveryTime}d` : 'N/A')
+                        : (product.currentDeliveryTime ? `${product.currentDeliveryTime}d` : 'N/A')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Supplier: </span>
+                    <span className="text-sm font-semibold">
+                      {product.type === "external" 
+                        ? product.bestPriceSupplier 
+                        : product.currentPriceSupplier}
+                    </span>
+                  </div>
+                  {product.type === "in-house" && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Margin:</span>
+                      <span className="text-sm font-semibold">{round1(product.currentMargin)}%</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Improvement Info - Only if exists */}
+                {(hasMarginImprovement || hasDeliveryImprovement) && (
+                  <div className="mt-2 pt-2 border-t border-border/50">
+                    <div className="flex items-center gap-4 flex-wrap text-xs">
+                      {hasMarginImprovement && (
+                        <div className="flex items-center gap-1.5">
+                          <TrendingDown className="h-3 w-3 text-green-600" />
+                          <span className="text-muted-foreground">Best price:</span>
+                          <span className="font-semibold text-green-600">€{product.bestPrice.toFixed(2)}</span>
+                          <span className="text-muted-foreground">({product.bestPriceSupplier})</span>
+                          <span className="text-green-600">Save €{(product.currentPrice - product.bestPrice).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {hasDeliveryImprovement && product.bestDeliveryTime && (
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3 w-3 text-orange-600" />
+                          <span className="text-muted-foreground">Fastest:</span>
+                          <span className="font-semibold text-orange-600">{product.bestDeliveryTime}d</span>
+                          <span className="text-muted-foreground">({product.bestDeliverySupplier})</span>
+                          <span className="text-orange-600">{product.currentDeliveryTime! - product.bestDeliveryTime}d faster</span>
+                        </div>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">{product.category}</p>
-                  </div>
-                </div>
-
-                {/* Pricing & Margin Metrics */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                  <div className="bg-primary/5 p-3 rounded-lg border border-primary/10">
-                    <p className="text-xs text-muted-foreground mb-1">Best Available Price</p>
-                    <p className="text-xl font-bold text-primary">€{product.bestPrice.toFixed(2)}</p>
-                    {product.type === "in-house" && product.bestPrice < product.currentPrice && (
-                      <p className="text-xs text-success flex items-center gap-1 mt-1">
-                        <TrendingDown className="h-3 w-3" />
-                        €{(product.currentPrice - product.bestPrice).toFixed(2)} savings
-                      </p>
-                    )}
-                  </div>
-                  <div className="bg-success/5 p-3 rounded-lg border border-success/10">
-                    <p className="text-xs text-muted-foreground mb-1">Best Margin</p>
-                    <p className="text-xl font-bold text-success">{product.bestMargin}%</p>
-                    {product.type === "in-house" && product.bestMargin > product.currentMargin && (
-                      <p className="text-xs text-success flex items-center gap-1 mt-1">
-                        <TrendingUp className="h-3 w-3" />
-                        +{product.bestMargin - product.currentMargin}% potential
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Sell Price</p>
-                    <p className="text-lg font-semibold text-foreground">€{product.sellPrice.toFixed(2)}</p>
-                    {product.type === "in-house" && (
-                      <p className="text-xs text-muted-foreground mt-1">Current: {product.currentMargin}%</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Best Supplier</p>
-                    <p className="text-sm font-medium text-foreground">{product.supplier}</p>
-                    {product.type === "external" && (
-                      <p className="text-xs text-blue-600 mt-1">High margin opportunity</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* External product info */}
-                {product.type === "external" && (
-                  <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm font-medium text-blue-900 flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4" />
-                      High-Margin Expansion Opportunity
-                    </p>
-                    <p className="text-xs text-blue-700 mt-1">
-                      New product with {product.bestMargin}% margin potential • Never purchased before
-                    </p>
                   </div>
                 )}
+              </div>
 
-                {/* Actions */}
-                <div className="flex gap-2 mt-4">
-                  <Button onClick={() => handleCheckAvailability(product.name)} size="sm" className="flex items-center gap-2">
-                    <Phone className="h-3 w-3" />
-                    Check Availability
-                  </Button>
-                </div>
+              {/* Actions */}
+              <div className="flex-shrink-0">
+                <Button onClick={() => handleCheckAvailability(product.name)} size="sm" variant="outline" className="flex items-center gap-2">
+                  <Phone className="h-3 w-3" />
+                  Check availability
+                </Button>
               </div>
             </div>
           </Card>
-        ))}
-      </div>
-
-      {/* Active Purchase Orders */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Active Purchase Orders</h3>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
-                <span className="font-mono text-sm font-medium text-foreground">PO-3421</span>
-                <Badge variant="destructive">Delayed</Badge>
-                <span className="text-sm text-muted-foreground">BioMed Labs</span>
-              </div>
-              <p className="text-sm text-foreground">Amoxicillin 500mg - 200 units</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Expected: Feb 10 → Revised: Feb 15 (+5 days)
-              </p>
+          );
+          })}
+          
+          {/* See More / Show Less Button */}
+          {(hasMoreProducts || showLessButton) && (
+            <div className="flex justify-center pt-4">
+              {hasMoreProducts ? (
+                <Button
+                  variant="outline"
+                  onClick={() => setDisplayLimit(prev => prev + 10)}
+                  className="w-full max-w-xs"
+                >
+                  See more ({sortedProducts.length - displayLimit} remaining)
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => setDisplayLimit(10)}
+                  className="w-full max-w-xs"
+                >
+                  Show less
+                </Button>
+              )}
             </div>
-            <Button onClick={() => handleTrackPO("PO-3421")} size="sm" variant="outline">Track</Button>
-          </div>
-
-          <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
-                <span className="font-mono text-sm font-medium text-foreground">PO-3427</span>
-                <Badge className="bg-success text-success-foreground">On Track</Badge>
-                <span className="text-sm text-muted-foreground">Medisupply SAS</span>
-              </div>
-              <p className="text-sm text-foreground">Paracetamol 500mg - 300 units</p>
-              <p className="text-xs text-muted-foreground mt-1">Expected: Feb 11 (in 4 days)</p>
-            </div>
-            <Button onClick={() => handleTrackPO("PO-3427")} size="sm" variant="outline">Track</Button>
-          </div>
-
-          <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
-                <span className="font-mono text-sm font-medium text-foreground">PO-3431</span>
-                <Badge className="bg-warning text-warning-foreground">Pending</Badge>
-                <span className="text-sm text-muted-foreground">PharmaCore Europe</span>
-              </div>
-              <p className="text-sm text-foreground">Ibuprofen 400mg - 500 units</p>
-              <p className="text-xs text-muted-foreground mt-1">Missing ETA confirmation</p>
-            </div>
-            <Button onClick={() => handleTrackPO("PO-3431")} size="sm" variant="outline">Track</Button>
-          </div>
+          )}
         </div>
-      </Card>
+      )}
 
       {/* Product Details Dialog */}
       <Dialog open={detailsDialog.open} onOpenChange={(open) => setDetailsDialog({ open, product: null })}>
@@ -689,9 +726,16 @@ const InventoryOrders = () => {
               
               <div className="space-y-2">
                 <p className="text-sm font-medium">Available Suppliers</p>
-                {supplierOptions.map((supplier) => {
-                  const price = supplier.prices[switchSupplierDialog.product.sku as keyof typeof supplier.prices];
-                  const isCurrentSupplier = supplier.name === switchSupplierDialog.product.supplier;
+                {loadingSuppliers ? (
+                  <div className="flex items-center justify-center gap-2 py-4">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Loading suppliers...</span>
+                  </div>
+                ) : supplierOptions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4">No suppliers available</p>
+                ) : (
+                  supplierOptions.map((supplier) => {
+                    const isCurrentSupplier = supplier.id === switchSupplierDialog.product.supplier_id;
                   
                   return (
                     <Card 
@@ -710,11 +754,11 @@ const InventoryOrders = () => {
                           <div className="grid grid-cols-3 gap-4 text-sm">
                             <div>
                               <p className="text-muted-foreground">Unit Price</p>
-                              <p className="font-semibold text-lg">€{price.toFixed(2)}</p>
+                              <p className="font-semibold text-lg">€{supplier.price.toFixed(2)}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground">Delivery Time</p>
-                              <p className="font-medium">{supplier.deliveryTime}</p>
+                              <p className="font-medium">{supplier.delivery_time}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground">Rating</p>
@@ -741,7 +785,8 @@ const InventoryOrders = () => {
                       </div>
                     </Card>
                   );
-                })}
+                  })
+                )}
               </div>
             </div>
           )}
