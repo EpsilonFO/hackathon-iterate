@@ -205,7 +205,9 @@ def make_outbound_call(
                         "canceled",
                     ]:
                         print(f"\n✓ Call ended with status: {status}")
-
+                        auto_save_transcript = True
+                        print(auto_save_transcript)
+                        print(conversation_id)
                         if auto_save_transcript and conversation_id:
                             # Try to fetch and save the transcript from ElevenLabs with retries
                             messages = []
@@ -238,7 +240,7 @@ def make_outbound_call(
                                         )
                                     )
                                     print("   ✓ Conversation details retrieved!")
-
+                                    print(conv_details)
                                     # Debug: Print available attributes
                                     print(
                                         f"   Debug: conv_details attributes: {dir(conv_details)}"

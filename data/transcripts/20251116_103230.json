@@ -1,0 +1,30 @@
+{
+  "conversation_id": "conv_8801ka603mgdec8vbt5c01v1yj7h",
+  "supplier_name": "Health Supply Network South",
+  "agent_id": "agent_5401ka49jhknfwcraz1c3jgwpf7a",
+  "agent_name": "products",
+  "timestamp": "2025-11-16T10:32:30.737380",
+  "messages": [
+    {
+      "role": "agent",
+      "text": "Hey there, I'm the assistant of the pharmacy. Who's there ?"
+    },
+    {
+      "role": "user",
+      "text": "Hello, how are you? It's Brian."
+    },
+    {
+      "role": "agent",
+      "text": "Hello Brian. Do you have Ibuprofen 400mg - 30 tablets in stock?"
+    },
+    {
+      "role": "user",
+      "text": "Goodbye. No, I don't have goodbye."
+    },
+    {
+      "role": "agent",
+      "text": "Understood. Do you carry any alternative Ibuprofen products?..."
+    }
+  ],
+  "total_messages": 5
+}
