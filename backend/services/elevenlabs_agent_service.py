@@ -362,6 +362,7 @@ def call_agent(
         wait_for_completion=True,
         auto_save_transcript=True,
     )
+    result["agent_name"] = agent_name
 
     print("\n✓ Call completed!")
     print(f"  Conversation ID: {result.get('conversation_id')}")
