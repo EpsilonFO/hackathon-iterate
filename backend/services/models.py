@@ -98,6 +98,8 @@ class ModifiedProductInformation(BaseModel):
     new_last_information_update: str
     product_id: str | None = None
     fournisseur_id: str | None = None
+    new_price: float | None = None
+    new_delivery_time: int | None = None
 
 
 class Order(BaseModel):

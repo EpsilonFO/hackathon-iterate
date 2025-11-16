@@ -138,7 +138,7 @@ export interface AgentTask {
 }
 
 export interface AgentActivityItem extends AgentTask {
-  task_type: "delivery_risk" | "price_update" | "supplier_followup" | "product_discovery";
+  task_type: "availability" | "delivery" | "products";
   description: string | null;
 }
 

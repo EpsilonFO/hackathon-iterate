@@ -2,19 +2,18 @@ import React from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Clock, Package, Phone, PhoneCall, CheckCircle2, AlertCircle, DollarSign, Loader2, MessageSquare } from "lucide-react";
+import { AlertTriangle, Clock, Package, Phone, CheckCircle2, AlertCircle, Loader2, MessageSquare, Truck, Search, Bot, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { agentApi, AgentActivitySummary, AgentActivityItem } from "@/lib/api";
+import { agentApi, AgentActivityItem, Transcript } from "@/lib/api";
 
 const ControlTower = () => {
   const { toast } = useToast();
-  const [transcriptDialog, setTranscriptDialog] = React.useState<{ open: boolean; content: string; supplierName?: string }>({
+  const [transcriptDialog, setTranscriptDialog] = React.useState<{ open: boolean; transcript: Transcript | null; supplierName?: string }>({
     open: false,
-    content: "",
+    transcript: null,
     supplierName: undefined,
   });
-  const [summary, setSummary] = React.useState<AgentActivitySummary | null>(null);
   const [activities, setActivities] = React.useState<AgentActivityItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [loadingTranscript, setLoadingTranscript] = React.useState<string | null>(null);
@@ -24,12 +23,8 @@ const ControlTower = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const limit = 10; // Use same limit for both summary and recap
-        const [summaryData, recapData] = await Promise.all([
-          agentApi.getActivitySummary(limit),
-          agentApi.getActivityRecap(limit),
-        ]);
-        setSummary(summaryData);
+        const limit = 10; // Use same limit for recap
+        const recapData = await agentApi.getActivityRecap(limit);
         setActivities(recapData.activities);
       } catch (error) {
         console.error("Error fetching agent data:", error);
@@ -45,6 +40,42 @@ const ControlTower = () => {
 
     fetchData();
   }, [toast]);
+
+  // Calculate counts and time saved from activities
+  const calculateStats = () => {
+    const stats = {
+      availability_checks: 0,
+      delivery_checks: 0,
+      product_inquiries: 0,
+      time_saved_minutes: 0,
+    };
+
+    activities.forEach((activity) => {
+      // Count completed activities by type
+      if (activity.status === "completed") {
+        switch (activity.task_type) {
+          case "availability":
+            stats.availability_checks++;
+            break;
+          case "delivery":
+            stats.delivery_checks++;
+            break;
+          case "products":
+            stats.product_inquiries++;
+            break;
+        }
+      }
+
+      // Calculate time saved: 1 message = 30 seconds = 0.5 minutes
+      if (activity.total_messages > 0) {
+        stats.time_saved_minutes += activity.total_messages * 0.5;
+      }
+    });
+
+    return stats;
+  };
+
+  const stats = calculateStats();
 
   const handleUnriskDeliveries = () => {
     toast({
@@ -74,23 +105,6 @@ const ControlTower = () => {
     });
   };
 
-  const handleApplyUpdate = async (taskId: string, supplier: string) => {
-    try {
-      await agentApi.parseConversation(taskId);
-      toast({
-        title: "Update Applied",
-        description: `Information from ${supplier} has been updated in the system`,
-      });
-    } catch (error) {
-      console.error("Error applying update:", error);
-      toast({
-        title: "Error",
-        description: "Failed to apply update",
-        variant: "destructive",
-      });
-    }
-  };
-
   const handleViewTranscript = async (taskId: string | null, conversationId: string | null, supplier: string) => {
     if (!taskId && !conversationId) {
       toast({
@@ -109,7 +123,7 @@ const ControlTower = () => {
       
       setTranscriptDialog({
         open: true,
-        content: transcript.formatted_text || "No transcript content available",
+        transcript: transcript,
         supplierName: supplier,
       });
     } catch (error) {
@@ -132,35 +146,33 @@ const ControlTower = () => {
     });
   };
 
-  const handleRecall = async (supplier: string, agentName?: string) => {
-    try {
-      const response = await agentApi.startConversation({
-        supplier_name: supplier,
-        agent_name: agentName || "products",
-      });
-      toast({
-        title: "Re-calling Supplier",
-        description: `Agent is calling ${supplier} again...`,
-      });
-    } catch (error) {
-      console.error("Error starting conversation:", error);
-      toast({
-        title: "Error",
-        description: "Failed to start conversation",
-        variant: "destructive",
-      });
-    }
-  };
 
-  // Calculate time saved per category (rough estimates)
-  const getTimeSavedForCategory = (count: number, category: string) => {
-    const timePerItem: Record<string, number> = {
-      delivery_risks: 9,
-      followups: 6,
-      price_checks: 2,
-      product_matches: 6,
-    };
-    return count * (timePerItem[category] || 0);
+  // Calculate time saved per category based on messages
+  const getTimeSavedForCategory = (category: string) => {
+    let totalMessages = 0;
+    activities.forEach((activity) => {
+      if (activity.status === "completed") {
+        switch (category) {
+          case "availability":
+            if (activity.task_type === "availability") {
+              totalMessages += activity.total_messages;
+            }
+            break;
+          case "delivery":
+            if (activity.task_type === "delivery") {
+              totalMessages += activity.total_messages;
+            }
+            break;
+          case "products":
+            if (activity.task_type === "products") {
+              totalMessages += activity.total_messages;
+            }
+            break;
+        }
+      }
+    });
+    // 1 message = 30 seconds = 0.5 minutes
+    return Math.round(totalMessages * 0.5);
   };
 
   if (loading) {
@@ -174,22 +186,41 @@ const ControlTower = () => {
   return (
     <div className="space-y-6">
       {/* Core Services Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="p-6 border-l-4 border-l-primary hover:shadow-lg transition-shadow cursor-pointer">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-base font-bold text-foreground">Availability Checks</p>
+              <p className="text-3xl font-bold text-foreground mt-1">
+                {stats.availability_checks}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Saved <strong className="text-primary">
+                  {getTimeSavedForCategory("availability")} min
+                </strong> checking product availability
+              </p>
+            </div>
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Package className="h-5 w-5 text-primary" />
+            </div>
+          </div>
+        </Card>
+
         <Card className="p-6 border-l-4 border-l-critical hover:shadow-lg transition-shadow cursor-pointer">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-base font-bold text-foreground">Delivery Risks Resolved</p>
+              <p className="text-base font-bold text-foreground">Delivery Follow Ups</p>
               <p className="text-3xl font-bold text-foreground mt-1">
-                {summary?.delivery_risks_resolved ?? 0}
+                {stats.delivery_checks}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Saved <strong className="text-critical">
-                  {getTimeSavedForCategory(summary?.delivery_risks_resolved ?? 0, "delivery_risks")} min
-                </strong> of ETA checks today
+                  {getTimeSavedForCategory("delivery")} min
+                </strong> checking delivery status
               </p>
             </div>
             <div className="p-2 bg-critical/10 rounded-lg">
-              <AlertTriangle className="h-5 w-5 text-critical" />
+              <Truck className="h-5 w-5 text-critical" />
             </div>
           </div>
         </Card>
@@ -197,56 +228,18 @@ const ControlTower = () => {
         <Card className="p-6 border-l-4 border-l-moderate hover:shadow-lg transition-shadow cursor-pointer">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-base font-bold text-foreground">Supplier Follow-ups Sent</p>
+              <p className="text-base font-bold text-foreground">Product Inquiries</p>
               <p className="text-3xl font-bold text-foreground mt-1">
-                {summary?.supplier_followups_sent ?? 0}
+                {stats.product_inquiries}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Avoided <strong className="text-moderate">
-                  {getTimeSavedForCategory(summary?.supplier_followups_sent ?? 0, "followups")} min
-                </strong> of calls & emails
+                Saved <strong className="text-moderate">
+                  {getTimeSavedForCategory("products")} min
+                </strong> getting product information
               </p>
             </div>
             <div className="p-2 bg-moderate/10 rounded-lg">
-              <Phone className="h-5 w-5 text-moderate" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 border-l-4 border-l-low hover:shadow-lg transition-shadow cursor-pointer">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-base font-bold text-foreground">Price Checks Completed</p>
-              <p className="text-3xl font-bold text-foreground mt-1">
-                {summary?.price_checks_completed ?? 0}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Saved <strong className="text-low">
-                  {getTimeSavedForCategory(summary?.price_checks_completed ?? 0, "price_checks")} min
-                </strong> on manual lookup
-              </p>
-            </div>
-            <div className="p-2 bg-low/10 rounded-lg">
-              <DollarSign className="h-5 w-5 text-low" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 border-l-4 border-l-primary hover:shadow-lg transition-shadow cursor-pointer">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-base font-bold text-foreground">New Product Matches</p>
-              <p className="text-3xl font-bold text-foreground mt-1">
-                {summary?.new_product_matches ?? 0}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Replaced <strong className="text-primary">
-                  {getTimeSavedForCategory(summary?.new_product_matches ?? 0, "product_matches")} min
-                </strong> of market scanning
-              </p>
-            </div>
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Package className="h-5 w-5 text-primary" />
+              <Search className="h-5 w-5 text-moderate" />
             </div>
           </div>
         </Card>
@@ -265,46 +258,36 @@ const ControlTower = () => {
               // Get task type colors and styling
               const getTaskTypeConfig = () => {
                 switch (activity.task_type) {
-                  case "delivery_risk":
-                    return {
-                      borderColor: "border-l-critical",
-                      bgColor: "bg-critical/5",
-                      iconColor: "text-critical",
-                      iconBg: "bg-critical/10",
-                      icon: AlertTriangle,
-                      title: "Delivery Risk Check",
-                      shortTitle: "Delivery",
-                    };
-                  case "price_update":
-                    return {
-                      borderColor: "border-l-low",
-                      bgColor: "bg-low/5",
-                      iconColor: "text-low",
-                      iconBg: "bg-low/10",
-                      icon: DollarSign,
-                      title: "Price Update",
-                      shortTitle: "Pricing",
-                    };
-                  case "product_discovery":
+                  case "availability":
                     return {
                       borderColor: "border-l-primary",
                       bgColor: "bg-primary/5",
                       iconColor: "text-primary",
                       iconBg: "bg-primary/10",
                       icon: Package,
-                      title: "Product Discovery",
-                      shortTitle: "Discovery",
+                      title: "Availability Check",
+                      shortTitle: "Availability",
                     };
-                  case "supplier_followup":
+                  case "delivery":
+                    return {
+                      borderColor: "border-l-critical",
+                      bgColor: "bg-critical/5",
+                      iconColor: "text-critical",
+                      iconBg: "bg-critical/10",
+                      icon: Truck,
+                      title: "Delivery Check",
+                      shortTitle: "Delivery",
+                    };
+                  case "products":
                   default:
                     return {
                       borderColor: "border-l-moderate",
                       bgColor: "bg-moderate/5",
                       iconColor: "text-moderate",
                       iconBg: "bg-moderate/10",
-                      icon: Phone,
-                      title: activity.status === "failed" ? "Supplier Not Responding" : "Supplier Follow-up",
-                      shortTitle: "Follow-up",
+                      icon: Search,
+                      title: activity.status === "failed" ? "Product Inquiry Failed" : "Product Inquiry",
+                      shortTitle: "Products",
                     };
                 }
               };
@@ -367,14 +350,12 @@ const ControlTower = () => {
 
               const getTaskTitle = () => {
                 switch (activity.task_type) {
-                  case "delivery_risk":
-                    return activity.status === "completed" ? "Delivery Risk Resolved" : "Unrisking Late Delivery";
-                  case "price_update":
-                    return activity.status === "completed" ? "Price Update Complete" : "Price Update";
-                  case "product_discovery":
-                    return activity.status === "completed" ? "New Product Match Found" : "Product Discovery";
-                  case "supplier_followup":
-                    return activity.status === "failed" ? "Supplier Not Responding" : "Supplier Follow-up";
+                  case "availability":
+                    return activity.status === "completed" ? "Availability Check Complete" : "Checking Availability";
+                  case "delivery":
+                    return activity.status === "completed" ? "Delivery Check Complete" : "Checking Delivery";
+                  case "products":
+                    return activity.status === "completed" ? "Product Inquiry Complete" : "Product Inquiry";
                   default:
                     return "Agent Activity";
                 }
@@ -445,60 +426,30 @@ const ControlTower = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       {activity.status === "completed" && activity.conversation_id && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8"
-                            onClick={() => handleApplyUpdate(activity.task_id, activity.supplier_name)}
-                          >
-                            Apply Update
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8"
-                            onClick={() =>
-                              handleViewTranscript(activity.task_id, activity.conversation_id, activity.supplier_name)
-                            }
-                            disabled={loadingTranscript === activity.task_id}
-                          >
-                            {loadingTranscript === activity.task_id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              "View Transcript"
-                            )}
-                          </Button>
-                        </>
-                      )}
-                      {activity.status === "failed" && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            className="h-8"
-                            onClick={() => handleEscalate(activity.supplier_name)}
-                          >
-                            Escalate
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8"
-                            onClick={() => handleRecall(activity.supplier_name, activity.agent_name)}
-                          >
-                            Re-call
-                          </Button>
-                        </>
-                      )}
-                      {(activity.status === "running" || activity.status === "pending") && (
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-8"
-                          onClick={() => handleRecall(activity.supplier_name, activity.agent_name)}
+                          onClick={() =>
+                            handleViewTranscript(activity.task_id, activity.conversation_id, activity.supplier_name)
+                          }
+                          disabled={loadingTranscript === activity.task_id}
                         >
-                          View Status
+                          {loadingTranscript === activity.task_id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            "View Transcript"
+                          )}
+                        </Button>
+                      )}
+                      {activity.status === "failed" && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-8"
+                          onClick={() => handleEscalate(activity.supplier_name)}
+                        >
+                          Escalate
                         </Button>
                       )}
                     </div>
@@ -512,15 +463,63 @@ const ControlTower = () => {
 
       {/* Transcript Dialog */}
       <Dialog open={transcriptDialog.open} onOpenChange={(open) => setTranscriptDialog({ ...transcriptDialog, open })}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
               Call Transcript{transcriptDialog.supplierName ? ` - ${transcriptDialog.supplierName}` : ""}
             </DialogTitle>
-            <DialogDescription>AI agent conversation transcript</DialogDescription>
+            <DialogDescription>
+              {transcriptDialog.transcript?.total_messages || 0} messages • {transcriptDialog.transcript?.timestamp ? new Date(transcriptDialog.transcript.timestamp).toLocaleString() : ""}
+            </DialogDescription>
           </DialogHeader>
-          <div className="mt-4 p-4 bg-muted rounded-lg max-h-96 overflow-y-auto">
-            <p className="text-sm text-foreground whitespace-pre-wrap">{transcriptDialog.content}</p>
+          <div className="mt-4 flex-1 overflow-y-auto space-y-3 pr-2">
+            {transcriptDialog.transcript?.messages && transcriptDialog.transcript.messages.length > 0 ? (
+              transcriptDialog.transcript.messages.map((message, index) => {
+                const isAgent = message.role === "agent";
+                return (
+                  <div
+                    key={index}
+                    className={`flex gap-3 ${isAgent ? "justify-start" : "justify-end"}`}
+                  >
+                    {isAgent && (
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Bot className="h-4 w-4 text-primary" />
+                      </div>
+                    )}
+                    <div
+                      className={`flex flex-col max-w-[80%] ${
+                        isAgent ? "items-start" : "items-end"
+                      }`}
+                    >
+                      <div
+                        className={`px-4 py-2.5 rounded-lg ${
+                          isAgent
+                            ? "bg-primary/10 text-foreground border border-primary/20"
+                            : "bg-muted text-foreground border border-border"
+                        }`}
+                      >
+                        <div className="text-xs font-medium mb-1.5 opacity-70">
+                          {isAgent ? "AI Agent" : "Supplier Representative"}
+                        </div>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                          {message.text}
+                        </p>
+                      </div>
+                    </div>
+                    {!isAgent && (
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No transcript content available</p>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

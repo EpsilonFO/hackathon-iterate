@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from backend.controllers.update_agent import update_agent
 from backend.services.conversation_manager import conversation_manager
+from backend.services.data_loader import get_data_loader
 from backend.services.elevenlabs_agent_service import start_agent_async
 from backend.services.transcript_parser_service import TranscriptParserService
 
@@ -232,14 +233,26 @@ async def parse_completed_conversation(task_id: str):
         )
 
     # Load the transcript from file
-    transcript_file = f"./data/transcripts/{task.conversation_id}.json"
+    # Search for transcript by conversation_id since we now use date format for filenames
+    transcripts_dir = Path("./data/transcripts")
+    transcript_data = None
 
-    try:
-        with open(transcript_file, "r", encoding="utf-8") as f:
-            transcript_data = json.load(f)
-    except FileNotFoundError:
+    if transcripts_dir.exists():
+        for transcript_file in transcripts_dir.glob("*.json"):
+            try:
+                with open(transcript_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if data.get("conversation_id") == task.conversation_id:
+                        transcript_data = data
+                        break
+            except Exception as e:
+                print(f"Error reading transcript file {transcript_file}: {e}")
+                continue
+
+    if transcript_data is None:
         raise HTTPException(
-            status_code=404, detail=f"Transcript file not found: {transcript_file}"
+            status_code=404,
+            detail=f"Transcript not found for conversation_id: {task.conversation_id}",
         )
 
     # Parse the conversation
@@ -250,6 +263,9 @@ async def parse_completed_conversation(task_id: str):
         result = parser.parse_and_update_csv(
             transcript_data, task.supplier_name, save=True
         )
+        # Refresh data cache after updating CSV
+        data_loader = get_data_loader()
+        data_loader.reload_all()
         return {"status": "success", "result": result, "task_id": task_id}
     except Exception as e:
         raise HTTPException(
@@ -306,22 +322,29 @@ def transcript_to_activity_item(transcript: dict) -> dict:
     except Exception:
         created_at = datetime.now()
 
-    # Infer task type from transcript content or supplier name
-    messages = transcript.get("messages", [])
-    message_text = " ".join([msg.get("text", "").lower() for msg in messages])
+    # Use agent_name to determine task type
+    agent_name = transcript.get("agent_name", "products").lower()
 
-    if "delivery" in message_text or "eta" in message_text or "deliver" in message_text:
-        task_type = "delivery_risk"
-        description = f"Following up on delivery ETA with {supplier_name}"
-    elif "price" in message_text or "pricing" in message_text or "cost" in message_text:
-        task_type = "price_update"
-        description = f"Updating pricing information from {supplier_name}"
-    elif "product" in message_text or "new" in message_text or "offer" in message_text:
-        task_type = "product_discovery"
-        description = f"Searching for new products from {supplier_name}"
+    if agent_name == "delivery":
+        task_type = "delivery"
+        description = f"Checking delivery status with {supplier_name}"
+    elif agent_name == "availability":
+        task_type = "availability"
+        description = f"Checking product availability with {supplier_name}"
+    elif agent_name == "products":
+        task_type = "products"
+        description = f"Getting product information from {supplier_name}"
     else:
-        task_type = "supplier_followup"
-        description = f"Following up with {supplier_name}"
+        # Fallback: try to infer from agent_name or default to products
+        if "delivery" in agent_name:
+            task_type = "delivery"
+            description = f"Checking delivery status with {supplier_name}"
+        elif "availability" in agent_name:
+            task_type = "availability"
+            description = f"Checking product availability with {supplier_name}"
+        else:
+            task_type = "products"
+            description = f"Getting product information from {supplier_name}"
 
     # Use conversation_id as task_id for transcripts (since they don't have task_id)
     task_id = f"transcript_{conversation_id}"
@@ -351,22 +374,46 @@ def get_all_activities() -> List[dict]:
     """
     activities = []
 
+    # Get historical transcripts first to build a set of conversation_ids
+    transcripts = load_transcripts_from_folder()
+    transcript_conversation_ids = {
+        transcript.get("conversation_id") for transcript in transcripts
+    }
+
     # Get active tasks from conversation manager
+    # Only include tasks that are not completed OR don't have a transcript file yet
     tasks = conversation_manager.list_tasks()
     for task in tasks:
+        # Skip completed tasks that already have a transcript file
+        # (to avoid duplicates - completed tasks are represented by transcript files)
+        if (
+            task.status.value == "completed"
+            and task.conversation_id
+            and task.conversation_id in transcript_conversation_ids
+        ):
+            continue
+
         agent_name_lower = task.agent_name.lower()
-        if "delivery" in agent_name_lower or "eta" in agent_name_lower:
-            task_type = "delivery_risk"
-            description = f"Following up on delivery ETA with {task.supplier_name}"
-        elif "price" in agent_name_lower or "pricing" in agent_name_lower:
-            task_type = "price_update"
-            description = f"Updating pricing information from {task.supplier_name}"
-        elif "product" in agent_name_lower or "discovery" in agent_name_lower:
-            task_type = "product_discovery"
-            description = f"Searching for new products from {task.supplier_name}"
+        if agent_name_lower == "delivery":
+            task_type = "delivery"
+            description = f"Checking delivery status with {task.supplier_name}"
+        elif agent_name_lower == "availability":
+            task_type = "availability"
+            description = f"Checking product availability with {task.supplier_name}"
+        elif agent_name_lower == "products":
+            task_type = "products"
+            description = f"Getting product information from {task.supplier_name}"
         else:
-            task_type = "supplier_followup"
-            description = f"Following up with {task.supplier_name}"
+            # Fallback: try to infer from agent_name or default to products
+            if "delivery" in agent_name_lower:
+                task_type = "delivery"
+                description = f"Checking delivery status with {task.supplier_name}"
+            elif "availability" in agent_name_lower:
+                task_type = "availability"
+                description = f"Checking product availability with {task.supplier_name}"
+            else:
+                task_type = "products"
+                description = f"Getting product information from {task.supplier_name}"
 
         task_dict = task.to_dict()
         activities.append(
@@ -378,7 +425,6 @@ def get_all_activities() -> List[dict]:
         )
 
     # Get historical transcripts
-    transcripts = load_transcripts_from_folder()
     for transcript in transcripts:
         activity = transcript_to_activity_item(transcript)
         activities.append(activity)
@@ -506,22 +552,28 @@ async def get_transcript_by_conversation_id(conversation_id: str):
     Returns:
         TranscriptResponse with transcript data
     """
-    transcript_file = Path(f"./data/transcripts/{conversation_id}.json")
+    # Search for transcript by conversation_id in all transcript files
+    # since we now use date format for filenames
+    transcripts_dir = Path("./data/transcripts")
+    transcript_data = None
 
-    if not transcript_file.exists():
+    if transcripts_dir.exists():
+        for transcript_file in transcripts_dir.glob("*.json"):
+            try:
+                with open(transcript_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if data.get("conversation_id") == conversation_id:
+                        transcript_data = data
+                        break
+            except Exception as e:
+                print(f"Error reading transcript file {transcript_file}: {e}")
+                continue
+
+    if transcript_data is None:
         raise HTTPException(
             status_code=404,
             detail=f"Transcript not found for conversation_id: {conversation_id}",
         )
-
-    try:
-        with open(transcript_file, "r") as f:
-            transcript_data = json.load(f)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error reading transcript file: {str(e)}",
-        ) from e
 
     # Format transcript as readable text
     messages = transcript_data.get("messages", [])

@@ -1,0 +1,55 @@
+{
+  "conversation_id": "conv_4801ka9e1f3g5h7i9j1k3l5m7n9o1",
+  "supplier_name": "BioPharm Wholesale",
+  "agent_id": "agent_8201ka538drjfzxb1xkhhc3bts79",
+  "agent_name": "availability",
+  "timestamp": "2025-11-16T09:20:45.567890",
+  "messages": [
+    {
+      "role": "agent",
+      "text": "Good morning, this is David from City Pharma. I'm calling to check if you have Amoxicillin 250mg capsules in stock, specifically the 21-capsule pack."
+    },
+    {
+      "role": "user",
+      "text": "Good morning David. Unfortunately, we're currently out of stock on the 250mg capsules. However, we do have the 500mg capsules available, and we expect a restock of the 250mg version next week."
+    },
+    {
+      "role": "agent",
+      "text": "I see. When exactly next week can we expect the restock? We have an urgent need for the 250mg version."
+    },
+    {
+      "role": "user",
+      "text": "Our supplier has confirmed delivery for Tuesday, November 19th. So we should have it available by Wednesday, November 20th at the latest. Would you like me to reserve some stock for you?"
+    },
+    {
+      "role": "agent",
+      "text": "Yes, that would be very helpful. Can you reserve 30 packs for us? And what's the price per pack?"
+    },
+    {
+      "role": "user",
+      "text": "Absolutely, I'll reserve 30 packs for City Pharma. The price is 12.75 euros per pack. Since you're a regular customer, I can also offer you a 3% discount on this order."
+    },
+    {
+      "role": "agent",
+      "text": "That's very kind of you. We appreciate the discount. Can you confirm the delivery timeline once the stock arrives?"
+    },
+    {
+      "role": "user",
+      "text": "Of course. Once we receive the stock on Tuesday, we can ship it to you the same day, and you should receive it by Thursday, November 21st. I'll send you a confirmation email once the order is ready to ship."
+    },
+    {
+      "role": "agent",
+      "text": "Perfect. That timeline works well for us. Thank you so much for your assistance. Have a great day!"
+    },
+    {
+      "role": "user",
+      "text": "You're welcome, David. We'll keep you updated. Have a great day as well. Goodbye!"
+    },
+    {
+      "role": "agent",
+      "text": "Goodbye!"
+    }
+  ],
+  "total_messages": 11
+}
+
