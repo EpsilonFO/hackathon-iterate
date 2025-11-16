@@ -78,7 +78,9 @@ async def start_conversation(request: StartConversationRequest):
     api_key = request.api_key or os.getenv("ELEVENLABS_API_KEY")
     supplier_name = request.supplier_name or "Inconnu"
     product_name = request.product_name or "Inconnu"
+
     # update_agent(product_name, supplier_name)
+
     if not api_key:
         raise HTTPException(
             status_code=400,

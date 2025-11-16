@@ -78,7 +78,6 @@ def should_end_conversation(text: str) -> bool:
     # Check if the entire message is just a short goodbye/acknowledgment
     short_endings = [
         "thank you for your time",
-        "understood",
         "i understand you need to go",
         "thanks for your time",
     ]
