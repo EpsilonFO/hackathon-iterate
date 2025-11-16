@@ -373,22 +373,11 @@ def call_agent(
         wait_for_completion=True,
         auto_save_transcript=True,
     )
+    result["agent_name"] = agent_name
 
     print("\n✓ Call completed!")
     print(f"  Conversation ID: {result.get('conversation_id')}")
 
-    # return {
-    #     "conversation_id": conversation_id,
-    #     "supplier_name": supplier_name,
-    #     "agent_id": agent_id,
-    #     "timestamp": datetime.now().isoformat(),
-    #     "call_sid": call_sid,
-    #     "status": "call_initiated"
-    # }
-
-    # If transcript was already saved (e.g., on interrupt), don't save again
-    # The conversation_id from ElevenLabs will be used when saving in call_agent_background
-    result["agent_name"] = agent_name
     return result
 
 
