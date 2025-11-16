@@ -121,6 +121,69 @@ export interface ApiError {
 }
 
 // ============================================================================
+// Agent API Types
+// ============================================================================
+
+export interface AgentTask {
+  task_id: string;
+  agent_name: string;
+  supplier_name: string;
+  status: "pending" | "running" | "completed" | "failed";
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  conversation_id: string | null;
+  error: string | null;
+  total_messages: number;
+}
+
+export interface AgentActivityItem extends AgentTask {
+  task_type: "delivery_risk" | "price_update" | "supplier_followup" | "product_discovery";
+  description: string | null;
+}
+
+export interface AgentActivitySummary {
+  delivery_risks_resolved: number;
+  supplier_followups_sent: number;
+  price_checks_completed: number;
+  new_product_matches: number;
+  time_saved_minutes: number;
+}
+
+export interface AgentActivityRecap {
+  activities: AgentActivityItem[];
+  total_count: number;
+}
+
+export interface Transcript {
+  conversation_id: string;
+  supplier_name: string;
+  agent_id: string | null;
+  timestamp: string;
+  messages: Array<{
+    role: "agent" | "user" | string;
+    text: string;
+  }>;
+  total_messages: number;
+  formatted_text: string;
+}
+
+export interface StartConversationRequest {
+  agent_name?: string;
+  api_key?: string;
+  supplier_name?: string;
+  product_name?: string;
+}
+
+export interface StartConversationResponse {
+  task_id: string;
+  agent_name: string;
+  supplier_name: string;
+  status: string;
+  message: string;
+}
+
+// ============================================================================
 // Base API Client
 // ============================================================================
 
@@ -271,6 +334,77 @@ export const innovativeProductsApi = {
 };
 
 // ============================================================================
+// Agent API
+// ============================================================================
+
+export const agentApi = {
+  /**
+   * Get summary statistics of agent activities
+   * Counts activities from the same set shown in the recap (most recent activities)
+   */
+  getActivitySummary: async (limit: number = 10): Promise<AgentActivitySummary> => {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+    });
+    return apiClient.get<AgentActivitySummary>(`/api/agent/activity/summary?${params}`);
+  },
+
+  /**
+   * Get recent agent activities for the daily recap
+   */
+  getActivityRecap: async (limit: number = 10): Promise<AgentActivityRecap> => {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+    });
+    return apiClient.get<AgentActivityRecap>(`/api/agent/activity/recap?${params}`);
+  },
+
+  /**
+   * Get transcript by conversation_id
+   */
+  getTranscriptByConversationId: async (conversationId: string): Promise<Transcript> => {
+    return apiClient.get<Transcript>(`/api/agent/transcript/${conversationId}`);
+  },
+
+  /**
+   * Get transcript by task_id
+   */
+  getTranscriptByTaskId: async (taskId: string): Promise<Transcript> => {
+    return apiClient.get<Transcript>(`/api/agent/transcript/task/${taskId}`);
+  },
+
+  /**
+   * Start a new agent conversation
+   */
+  startConversation: async (
+    request: StartConversationRequest
+  ): Promise<StartConversationResponse> => {
+    return apiClient.post<StartConversationResponse>('/api/agent/start', request);
+  },
+
+  /**
+   * Get task status by task_id
+   */
+  getTaskStatus: async (taskId: string): Promise<AgentTask> => {
+    return apiClient.get<AgentTask>(`/api/agent/status/${taskId}`);
+  },
+
+  /**
+   * List all agent tasks
+   */
+  listTasks: async (): Promise<AgentTask[]> => {
+    return apiClient.get<AgentTask[]>('/api/agent/tasks');
+  },
+
+  /**
+   * Parse a completed conversation and update CSV
+   */
+  parseConversation: async (taskId: string): Promise<{ status: string; result: any; task_id: string }> => {
+    return apiClient.post(`/api/agent/parse/${taskId}`);
+  },
+};
+
+// ============================================================================
 // Default Export
 // ============================================================================
 
@@ -278,6 +412,7 @@ export default {
   products: productsApi,
   suppliers: suppliersApi,
   innovativeProducts: innovativeProductsApi,
+  agent: agentApi,
 };
 
 // Export API client for custom requests

@@ -1,0 +1,21 @@
+{
+  "conversation_id": "conv_7401ka57f501fwgsgw7dwfxhrv0e",
+  "supplier_name": "Inconnu",
+  "agent_id": "agent_8201ka538drjfzxb1xkhhc3bts79",
+  "timestamp": "2025-11-16T03:21:39.501066",
+  "messages": [
+    {
+      "role": "agent",
+      "text": "Hey there, I'm the assistant of the pharmacy. I'm checking availability for the product Sirop Toux Grasse."
+    },
+    {
+      "role": "user",
+      "text": "Making availability for the product Syrup Tewks Grass. Goodbye."
+    },
+    {
+      "role": "agent",
+      "text": "Thank you. Goodbye."
+    }
+  ],
+  "total_messages": 3
+}

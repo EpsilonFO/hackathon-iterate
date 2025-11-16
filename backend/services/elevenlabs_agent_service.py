@@ -3,7 +3,6 @@ import os
 import signal
 import threading
 from datetime import datetime
-from typing import Optional
 
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
@@ -341,6 +340,18 @@ def call_agent_background(
             supplier_name=supplier_name,
             enable_signal_handler=False,
         )
+
+        # Save the transcript to file
+        # Ensure supplier_name is preserved from the result (in case it was modified)
+        transcript_data = {
+            "conversation_id": result.get("conversation_id"),
+            "supplier_name": result.get("supplier_name", supplier_name),
+            "agent_id": result.get("agent_id"),
+            "timestamp": result.get("timestamp"),
+            "messages": result.get("messages", []),
+            "total_messages": result.get("total_messages", 0),
+        }
+        save_transcript(transcript_data)
 
         # Update status to completed
         conversation_manager.update_task_status(
