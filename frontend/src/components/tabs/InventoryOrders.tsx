@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,146 +10,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Search, AlertTriangle, TrendingDown, Phone, TrendingUp, Package, Clock, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-// Supplier options with prices and delivery times
-const supplierOptions = [
-  {
-    name: "Medisupply SAS",
-    rating: 94,
-    deliveryTime: "2-3 days",
-    prices: {
-      "PARA500": 12.50,
-      "IBU400": 18.20,
-      "AMOX500": 24.90,
-      "FUPLU": 8.75
-    }
-  },
-  {
-    name: "PharmaCore Europe",
-    rating: 82,
-    deliveryTime: "3-5 days",
-    prices: {
-      "PARA500": 11.80,
-      "IBU400": 16.50,
-      "AMOX500": 26.40,
-      "FUPLU": 9.20
-    }
-  },
-  {
-    name: "BioMed Labs",
-    rating: 78,
-    deliveryTime: "5-7 days",
-    prices: {
-      "PARA500": 13.20,
-      "IBU400": 17.90,
-      "AMOX500": 22.50,
-      "FUPLU": 10.50
-    }
-  },
-  {
-    name: "HealthChem Imports",
-    rating: 63,
-    deliveryTime: "7-10 days",
-    prices: {
-      "PARA500": 10.90,
-      "IBU400": 15.20,
-      "AMOX500": 28.00,
-      "FUPLU": 7.95
-    }
-  },
-  {
-    name: "EuroDrug Supply",
-    rating: 85,
-    deliveryTime: "2-4 days",
-    prices: {
-      "PARA500": 12.00,
-      "IBU400": 17.50,
-      "AMOX500": 23.80,
-      "FUPLU": 8.50
-    }
-  }
-];
-
-const products = [
-  {
-    sku: "PARA500",
-    name: "Paracetamol 500mg - 16 tablets",
-    category: "Pain Relief",
-    supplier: "Medisupply SAS",
-    type: "in-house",
-    currentPrice: 12.50,
-    bestPrice: 10.90,
-    sellPrice: 18.90,
-    currentMargin: 34,
-    bestMargin: 42
-  },
-  {
-    sku: "IBU400",
-    name: "Ibuprofen 400mg - 30 tablets",
-    category: "Anti-Inflammatory",
-    supplier: "PharmaCore Europe",
-    type: "in-house",
-    currentPrice: 16.50,
-    bestPrice: 15.20,
-    sellPrice: 24.50,
-    currentMargin: 33,
-    bestMargin: 38
-  },
-  {
-    sku: "AMOX500",
-    name: "Amoxicillin 500mg - 12 capsules",
-    category: "Antibiotic",
-    supplier: "BioMed Labs",
-    type: "in-house",
-    currentPrice: 22.50,
-    bestPrice: 22.50,
-    sellPrice: 32.90,
-    currentMargin: 32,
-    bestMargin: 32
-  },
-  {
-    sku: "FUPLU",
-    name: "Flu Relief Syrup 150ml",
-    category: "Cold & Flu",
-    supplier: "Medisupply SAS",
-    type: "in-house",
-    currentPrice: 8.75,
-    bestPrice: 7.95,
-    sellPrice: 13.90,
-    currentMargin: 37,
-    bestMargin: 43
-  },
-  {
-    sku: "VITD1000",
-    name: "Vitamin D 1000IU - 60 tablets",
-    category: "Vitamins",
-    supplier: "PharmaCore Europe",
-    type: "external",
-    currentPrice: 0,
-    bestPrice: 14.20,
-    sellPrice: 22.90,
-    currentMargin: 0,
-    bestMargin: 38
-  },
-  {
-    sku: "PROB30",
-    name: "Probiotic Complex - 30 capsules",
-    category: "Supplements",
-    supplier: "BioMed Labs",
-    type: "external",
-    currentPrice: 0,
-    bestPrice: 19.80,
-    sellPrice: 34.90,
-    currentMargin: 0,
-    bestMargin: 43
-  }
-];
+import { productsApi, type InventoryProduct, type ActivePurchaseOrder, type SupplierOption } from "@/lib/api";
 
 const InventoryOrders = () => {
   const { toast } = useToast();
-  const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; product: any | null }>({ open: false, product: null });
-  const [createPODialog, setCreatePODialog] = useState<{ open: boolean; product: any | null }>({ open: false, product: null });
-  const [switchSupplierDialog, setSwitchSupplierDialog] = useState<{ open: boolean; product: any | null }>({ open: false, product: null });
+  const [products, setProducts] = useState<InventoryProduct[]>([]);
+  const [orders, setOrders] = useState<ActivePurchaseOrder[]>([]);
+  const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
+  const [createPODialog, setCreatePODialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
+  const [switchSupplierDialog, setSwitchSupplierDialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
   const [poForm, setPOForm] = useState({
     quantity: "",
     supplier: "",
@@ -190,13 +62,57 @@ const InventoryOrders = () => {
       });
       console.error('Error starting agent:', error);
     }
-  };
+  // Fetch products and orders on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [productsResponse, ordersResponse] = await Promise.all([
+          productsApi.getInStoreProducts(),
+          productsApi.getOrders(),
+        ]);
+        setProducts(productsResponse.products);
+        setOrders(ordersResponse.orders);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to load data",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [toast]);
 
-  const handleViewDetails = (product: any) => {
+  // Fetch suppliers when switch supplier dialog opens
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      if (switchSupplierDialog.open && switchSupplierDialog.product) {
+        try {
+          setLoadingSuppliers(true);
+          const response = await productsApi.getProductSuppliers(switchSupplierDialog.product.id);
+          setSupplierOptions(response.suppliers);
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: error instanceof Error ? error.message : "Failed to load suppliers",
+            variant: "destructive",
+          });
+        } finally {
+          setLoadingSuppliers(false);
+        }
+      }
+    };
+    fetchSuppliers();
+  }, [switchSupplierDialog.open, switchSupplierDialog.product, toast]);
+
+  const handleViewDetails = (product: InventoryProduct) => {
     setDetailsDialog({ open: true, product });
   };
 
-  const handleCreatePO = (product: any) => {
+  const handleCreatePO = (product: InventoryProduct) => {
     const suggestedQty = Math.ceil(product.weeklyUse * 4);
     setPOForm({
       quantity: suggestedQty.toString(),
@@ -223,7 +139,7 @@ const InventoryOrders = () => {
     });
   };
 
-  const handleSwitchSupplier = (product: any) => {
+  const handleSwitchSupplier = (product: InventoryProduct) => {
     setSwitchSupplierDialog({ open: true, product });
   };
 
@@ -252,8 +168,16 @@ const InventoryOrders = () => {
       </Card>
 
       {/* Product List */}
-      <div className="space-y-4">
-        {products.map((product) => (
+      {loading ? (
+        <Card className="p-6">
+          <div className="flex items-center justify-center gap-2">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            <span>Loading products...</span>
+          </div>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {products.map((product) => (
           <Card key={product.sku} className="p-6 hover:shadow-lg transition-shadow">
             <div className="flex items-start gap-4">
               {/* Product Image Placeholder */}
@@ -343,54 +267,56 @@ const InventoryOrders = () => {
               </div>
             </div>
           </Card>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Active Purchase Orders */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold text-foreground mb-4">Active Purchase Orders</h3>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
-                <span className="font-mono text-sm font-medium text-foreground">PO-3421</span>
-                <Badge variant="destructive">Delayed</Badge>
-                <span className="text-sm text-muted-foreground">BioMed Labs</span>
-              </div>
-              <p className="text-sm text-foreground">Amoxicillin 500mg - 200 units</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Expected: Feb 10 → Revised: Feb 15 (+5 days)
-              </p>
-            </div>
-            <Button onClick={() => handleTrackPO("PO-3421")} size="sm" variant="outline">Track</Button>
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-4">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            <span>Loading orders...</span>
           </div>
-
-          <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
-                <span className="font-mono text-sm font-medium text-foreground">PO-3427</span>
-                <Badge className="bg-success text-success-foreground">On Track</Badge>
-                <span className="text-sm text-muted-foreground">Medisupply SAS</span>
-              </div>
-              <p className="text-sm text-foreground">Paracetamol 500mg - 300 units</p>
-              <p className="text-xs text-muted-foreground mt-1">Expected: Feb 11 (in 4 days)</p>
-            </div>
-            <Button onClick={() => handleTrackPO("PO-3427")} size="sm" variant="outline">Track</Button>
+        ) : orders.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">No active purchase orders</p>
+        ) : (
+          <div className="space-y-3">
+            {orders.map((order) => {
+              const estimatedDate = new Date(order.estimated_delivery);
+              const now = new Date();
+              const daysUntil = Math.ceil((estimatedDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+              const isDelayed = order.status === "delayed";
+              const isOnTrack = order.status === "on_track";
+              
+              return (
+                <div key={order.order_id} className="flex items-center justify-between p-4 rounded-lg border border-border">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="font-mono text-sm font-medium text-foreground">{order.order_id}</span>
+                      {isDelayed && <Badge variant="destructive">Delayed</Badge>}
+                      {isOnTrack && <Badge className="bg-green-500 text-white">On Track</Badge>}
+                      {order.status === "pending" && <Badge className="bg-yellow-500 text-white">Pending</Badge>}
+                      <span className="text-sm text-muted-foreground">{order.supplier_name}</span>
+                    </div>
+                    <p className="text-sm text-foreground">{order.product_name} - {order.quantity} units</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {isDelayed && order.actual_delivery ? (
+                        <>Expected: {new Date(order.estimated_delivery).toLocaleDateString()} → Actual: {new Date(order.actual_delivery).toLocaleDateString()}</>
+                      ) : order.status === "pending" ? (
+                        <>Missing ETA confirmation</>
+                      ) : (
+                        <>Expected: {estimatedDate.toLocaleDateString()} {daysUntil > 0 ? `(in ${daysUntil} days)` : "(overdue)"}</>
+                      )}
+                    </p>
+                  </div>
+                  <Button onClick={() => handleTrackPO(order.order_id)} size="sm" variant="outline">Track</Button>
+                </div>
+              );
+            })}
           </div>
-
-          <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
-                <span className="font-mono text-sm font-medium text-foreground">PO-3431</span>
-                <Badge className="bg-warning text-warning-foreground">Pending</Badge>
-                <span className="text-sm text-muted-foreground">PharmaCore Europe</span>
-              </div>
-              <p className="text-sm text-foreground">Ibuprofen 400mg - 500 units</p>
-              <p className="text-xs text-muted-foreground mt-1">Missing ETA confirmation</p>
-            </div>
-            <Button onClick={() => handleTrackPO("PO-3431")} size="sm" variant="outline">Track</Button>
-          </div>
-        </div>
+        )}
       </Card>
 
       {/* Product Details Dialog */}
@@ -689,9 +615,16 @@ const InventoryOrders = () => {
               
               <div className="space-y-2">
                 <p className="text-sm font-medium">Available Suppliers</p>
-                {supplierOptions.map((supplier) => {
-                  const price = supplier.prices[switchSupplierDialog.product.sku as keyof typeof supplier.prices];
-                  const isCurrentSupplier = supplier.name === switchSupplierDialog.product.supplier;
+                {loadingSuppliers ? (
+                  <div className="flex items-center justify-center gap-2 py-4">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Loading suppliers...</span>
+                  </div>
+                ) : supplierOptions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4">No suppliers available</p>
+                ) : (
+                  supplierOptions.map((supplier) => {
+                    const isCurrentSupplier = supplier.id === switchSupplierDialog.product.supplier_id;
                   
                   return (
                     <Card 
@@ -710,11 +643,11 @@ const InventoryOrders = () => {
                           <div className="grid grid-cols-3 gap-4 text-sm">
                             <div>
                               <p className="text-muted-foreground">Unit Price</p>
-                              <p className="font-semibold text-lg">€{price.toFixed(2)}</p>
+                              <p className="font-semibold text-lg">€{supplier.price.toFixed(2)}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground">Delivery Time</p>
-                              <p className="font-medium">{supplier.deliveryTime}</p>
+                              <p className="font-medium">{supplier.delivery_time}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground">Rating</p>
@@ -741,7 +674,8 @@ const InventoryOrders = () => {
                       </div>
                     </Card>
                   );
-                })}
+                  })
+                )}
               </div>
             </div>
           )}

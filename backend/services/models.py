@@ -176,3 +176,69 @@ class SupplierROIResponse(BaseModel):
     avg_performance: float
     excellent_count: int
     warning_count: int
+
+
+class InventoryProduct(BaseModel):
+    """Enriched in-store product with inventory information."""
+
+    id: str
+    sku: str
+    name: str
+    category: str
+    supplier: str
+    supplier_id: str
+    type: str  # "in-house" or "external"
+    currentPrice: float
+    bestPrice: float
+    sellPrice: float
+    currentMargin: float
+    bestMargin: float
+    stock: int
+    weeklyUse: int
+    stockoutDate: str
+    status: str  # "healthy", "low", "critical"
+
+
+class InventoryProductsResponse(BaseModel):
+    """Response model for in-store products endpoint."""
+
+    products: List[InventoryProduct]
+    total_count: int
+
+
+class ActivePurchaseOrder(BaseModel):
+    """Active purchase order model."""
+
+    order_id: str
+    product_name: str
+    quantity: int
+    supplier_name: str
+    estimated_delivery: str
+    actual_delivery: Optional[str]
+    status: str  # "on_track", "delayed", "pending"
+    order_date: str
+
+
+class PurchaseOrdersResponse(BaseModel):
+    """Response model for active purchase orders endpoint."""
+
+    orders: List[ActivePurchaseOrder]
+    total_count: int
+
+
+class SupplierOption(BaseModel):
+    """Supplier option for a product."""
+
+    id: str
+    name: str
+    price: float
+    delivery_time: str
+    rating: int
+    phone: str
+
+
+class SupplierOptionsResponse(BaseModel):
+    """Response model for product suppliers endpoint."""
+
+    suppliers: List[SupplierOption]
+    current_supplier_id: Optional[str]
