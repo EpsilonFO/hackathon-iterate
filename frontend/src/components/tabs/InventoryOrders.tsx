@@ -112,6 +112,7 @@ const InventoryOrders = () => {
       });
       console.error('Error starting agent:', error);
     }
+  };
   // Fetch products and orders on component mount
   useEffect(() => {
     const fetchData = async () => {
