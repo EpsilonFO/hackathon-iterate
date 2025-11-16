@@ -293,7 +293,7 @@ def call_agent(
     enable_signal_handler: bool = True,
 ):
     """
-    Call an ElevenLabs conversational agent and return the transcript.
+    Call an ElevenLabs conversational agent via Twilio outbound call.
 
     Args:
         agent_name: The name of the agent (e.g., "delivery" or "products")
@@ -304,17 +304,11 @@ def call_agent(
     Returns:
         dict: Conversation transcript with messages
     """
-    global messages, conversation_instance, current_supplier_name
-    messages = []
-    current_supplier_name = supplier_name
-
     # Initialize client
     if api_key is None:
         api_key = os.environ.get("ELEVENLABS_API_KEY")
 
-    client = ElevenLabs(api_key=api_key)
-
-    # Start conversation with the agent using callbacks to capture transcript
+    # Get agent ID based on agent name
     if agent_name == "delivery":
         agent_id = os.getenv("AGENT_DELIVERY_ID")
     elif agent_name == "availability":
@@ -322,80 +316,29 @@ def call_agent(
     else:  # agent_name == "products":
         agent_id = os.getenv("AGENT_PRODUCTS_ID")
 
-    conversation = Conversation(
-        client=client,
+    # Get Twilio configuration
+    agent_phone_number_id = os.getenv("TWILIO_PHONE_NUMBER_ID")
+    to_number = os.getenv("MY_PHONE_NUMBER")
+
+    print(f"📞 Starting Twilio outbound call for {agent_name} agent...")
+    print(f"   Calling: {to_number}")
+    print(f"   Supplier: {supplier_name}\n")
+
+    # Make the outbound call with automatic transcript saving
+    result = make_outbound_call(
         agent_id=agent_id,
-        requires_auth=bool(api_key),
-        audio_interface=DefaultAudioInterface(),
-        # Callbacks to capture the conversation
-        callback_agent_response=lambda response: capture_agent_message(
-            response, conversation
-        ),
-        callback_user_transcript=lambda transcript: capture_message("user", transcript),
+        agent_phone_number_id=agent_phone_number_id,
+        to_number=to_number,
+        api_key=api_key,
+        supplier_name=supplier_name,
+        wait_for_completion=True,
+        auto_save_transcript=True,
     )
 
-    conversation_instance = conversation
+    print(f"\n✓ Call completed!")
+    print(f"  Conversation ID: {result.get('conversation_id')}")
 
-    print("Starting conversation with agent...")
-    print("Speak to begin. Say 'goodbye' to end the conversation, or press Ctrl+C.\n")
-
-    # Handle Ctrl+C gracefully to save transcript before exit
-    # Only set signal handler if running in main thread
-    if enable_signal_handler:
-
-        def signal_handler(sig, frame):
-            print("\n\nEnding conversation...")
-            try:
-                conversation.end_session()
-            except:
-                pass
-            # Save transcript immediately
-            save_transcript_on_exit(supplier_name)
-            exit(0)
-
-        try:
-            signal.signal(signal.SIGINT, signal_handler)
-        except ValueError:
-            # Signal handler can't be set in non-main thread, which is fine
-            print("(Running in background thread - Ctrl+C handler disabled)")
-
-    try:
-        print("📞 Starting outbound call with automatic transcript saving...\n")
-        AGENT_ID = os.getenv("AGENT_PRODUCTS_ID")  # Or use AGENT_DELIVERY_ID, AGENT_AVAILABILITY_ID
-        AGENT_PHONE_NUMBER_ID = os.getenv("TWILIO_PHONE_NUMBER_ID")
-        TO_NUMBER = os.getenv("MY_PHONE_NUMBER")
-        SUPPLIER_NAME = os.getenv("SUPPLIER_NAME", "Fournisseur")  # Optional
-
-        result = make_outbound_call(
-            agent_id=AGENT_ID,
-            agent_phone_number_id=AGENT_PHONE_NUMBER_ID,
-            to_number=TO_NUMBER,
-            supplier_name=SUPPLIER_NAME,
-            wait_for_completion=True,  # Wait for call to complete
-            auto_save_transcript=True  # Automatically save transcript
-        )
-
-        print(f"\n✓ Call completed successfully!")
-        print(f"  Status: {result.get('status')}")
-        print(f"  Conversation ID: {result.get('conversation_id')}")
-
-    except Exception as e:
-        print(f"\n❌ Error making call: {e}")
-        exit(1)
-    # Wait for conversation to complete
-    conversation_id = conversation.wait_for_session_end()
-
-    print("\n\nConversation ended!")
-    print(f"Conversation ID: {conversation_id}")
-
-    return {
-        "conversation_id": conversation_id,
-        "supplier_name": supplier_name,
-        "agent_id": agent_id,
-        "timestamp": datetime.now().isoformat(),
-        "messages": messages,
-        "total_messages": len(messages),
-    }
+    return result
 
 
 def capture_message(role: str, text: str):
