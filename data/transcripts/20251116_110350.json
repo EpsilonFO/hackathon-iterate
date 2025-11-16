@@ -1,0 +1,18 @@
+{
+  "conversation_id": "conv_8601ka61x0mjegsvtq1hpy2zvvjs",
+  "supplier_name": "Pharma Depot Plus South",
+  "agent_id": "agent_5401ka49jhknfwcraz1c3jgwpf7a",
+  "agent_name": "products",
+  "timestamp": "2025-11-16T11:03:50.954391",
+  "messages": [
+    {
+      "role": "agent",
+      "text": "Hey there, I'm the assistant of the pharmacy. Who's there ?"
+    },
+    {
+      "role": "user",
+      "text": "It's funny, sir. I have a new product. It's a vinaigre blanc de nettoyage. I have 1,000 of them, $10 per unit, seven days delivery, and that's it. Goodbye."
+    }
+  ],
+  "total_messages": 2
+}
