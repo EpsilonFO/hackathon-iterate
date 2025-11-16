@@ -138,18 +138,70 @@ const SuppliersROI = () => {
     fetchData();
   }, [toast]);
 
-  const handleUpdateCatalog = (supplierName: string) => {
-    toast({
-      title: "Catalog Update",
-      description: `Opening catalog update for ${supplierName}`,
-    });
+  const handleUpdateCatalog = async (supplierName: string) => {
+    try {
+      const response = await fetch('/api/agent/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          agent_name: "products",
+          supplier_name: supplierName,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to start agent');
+      }
+
+      await response.json();
+
+      toast({
+        title: "Catalog Update",
+        description: `Agent started for ${supplierName}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to start catalog update for ${supplierName}`,
+        variant: "destructive",
+      });
+      console.error('Error starting agent:', error);
+    }
   };
 
-  const handleRemindSupplier = (supplierName: string) => {
-    toast({
-      title: "Follow Up ",
-      description: `Sending reminder to ${supplierName}`,
-    });
+  const handleRemindSupplier = async (supplierName: string) => {
+    try {
+      const response = await fetch('/api/agent/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          agent_name: "delivery",
+          supplier_name: supplierName,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to start agent');
+      }
+
+      await response.json();
+
+      toast({
+        title: "Follow Up",
+        description: `Agent started for ${supplierName}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to start follow up for ${supplierName}`,
+        variant: "destructive",
+      });
+      console.error('Error starting agent:', error);
+    }
   };
 
   if (loading) {

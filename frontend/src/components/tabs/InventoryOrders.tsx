@@ -157,11 +157,39 @@ const InventoryOrders = () => {
     urgency: "normal"
   });
 
-  const handleCheckAvailability = (productName: string) => {
-    toast({
-      title: "Checking Availability",
-      description: `Voice agent is calling suppliers for ${productName}`,
-    });
+  const handleCheckAvailability = async (productName: string) => {
+    try {
+      const response = await fetch('/api/agent/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          agent_name: "products",
+          product_name: productName,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('API Error:', errorData);
+        throw new Error(`Failed to start agent: ${response.status} ${response.statusText}`);
+      }
+
+      await response.json();
+
+      toast({
+        title: "Checking Availability",
+        description: `Voice agent is calling suppliers for ${productName}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : `Failed to start availability check for ${productName}`,
+        variant: "destructive",
+      });
+      console.error('Error starting agent:', error);
+    }
   };
 
   const handleViewDetails = (product: any) => {

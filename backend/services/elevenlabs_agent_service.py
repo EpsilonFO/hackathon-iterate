@@ -1,12 +1,19 @@
 import json
 import os
 import signal
+import threading
 from datetime import datetime
+from typing import Optional
 
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
 from elevenlabs.conversational_ai.conversation import Conversation
 from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInterface
+
+from backend.services.conversation_manager import (
+    ConversationStatus,
+    conversation_manager,
+)
 
 # Load environment variables
 load_dotenv()
@@ -87,13 +94,20 @@ def should_end_conversation(text: str) -> bool:
     return False
 
 
-def call_agent(agent_id: str, api_key: str = None, supplier_name: str = "Inconnu"):
+def call_agent(
+    agent_name: str,
+    api_key: str = None,
+    supplier_name: str = "Inconnu",
+    enable_signal_handler: bool = True,
+):
     """
     Call an ElevenLabs conversational agent and return the transcript.
 
     Args:
-        agent_id: The ID of your ElevenLabs agent
+        agent_name: The name of the agent (e.g., "delivery" or "products")
         api_key: Your ElevenLabs API key (or set ELEVENLABS_API_KEY env var)
+        supplier_name: Name of the supplier
+        enable_signal_handler: Whether to enable Ctrl+C handler (only works in main thread)
 
     Returns:
         dict: Conversation transcript with messages
@@ -109,6 +123,11 @@ def call_agent(agent_id: str, api_key: str = None, supplier_name: str = "Inconnu
     client = ElevenLabs(api_key=api_key)
 
     # Start conversation with the agent using callbacks to capture transcript
+    if agent_name == "delivery":
+        agent_id = os.getenv("AGENT_DELIVERY_ID")
+    else:  # agent_name == "products":
+        agent_id = os.getenv("AGENT_PRODUCTS_ID")
+
     conversation = Conversation(
         client=client,
         agent_id=agent_id,
@@ -127,17 +146,24 @@ def call_agent(agent_id: str, api_key: str = None, supplier_name: str = "Inconnu
     print("Speak to begin. Say 'goodbye' to end the conversation, or press Ctrl+C.\n")
 
     # Handle Ctrl+C gracefully to save transcript before exit
-    def signal_handler(sig, frame):
-        print("\n\nEnding conversation...")
-        try:
-            conversation.end_session()
-        except:
-            pass
-        # Save transcript immediately
-        save_transcript_on_exit(supplier_name)
-        exit(0)
+    # Only set signal handler if running in main thread
+    if enable_signal_handler:
 
-    signal.signal(signal.SIGINT, signal_handler)
+        def signal_handler(sig, frame):
+            print("\n\nEnding conversation...")
+            try:
+                conversation.end_session()
+            except:
+                pass
+            # Save transcript immediately
+            save_transcript_on_exit(supplier_name)
+            exit(0)
+
+        try:
+            signal.signal(signal.SIGINT, signal_handler)
+        except ValueError:
+            # Signal handler can't be set in non-main thread, which is fine
+            print("(Running in background thread - Ctrl+C handler disabled)")
 
     # Start the conversation
     conversation.start_session()
@@ -224,7 +250,7 @@ def save_transcript_on_exit(supplier_name: str = "Inconnu"):
         result = {
             "conversation_id": session_id,
             "supplier_name": supplier_name,
-            "agent_id": os.getenv("AGENT_ID"),
+            "agent_id": os.getenv("AGENT_PRODUCTS_ID"),
             "timestamp": datetime.now().isoformat(),
             "messages": messages,
             "total_messages": len(messages),
@@ -233,3 +259,75 @@ def save_transcript_on_exit(supplier_name: str = "Inconnu"):
         print(f"✓ Messages captured in this conversation: {len(messages)}")
     else:
         print("\n! No messages to save")
+
+
+def call_agent_background(
+    task_id: str, agent_name: str, api_key: str, supplier_name: str
+):
+    """
+    Execute call_agent in a background thread and update task status.
+
+    Args:
+        task_id: ID of the task to track
+        agent_name: Name of the agent to call
+        api_key: ElevenLabs API key
+        supplier_name: Name of the supplier
+    """
+    try:
+        # Update status to running
+        conversation_manager.update_task_status(task_id, ConversationStatus.RUNNING)
+
+        # Call the agent (this will block in this thread, but not the main FastAPI thread)
+        # Disable signal handler since we're in a background thread
+        result = call_agent(
+            agent_name,
+            api_key=api_key,
+            supplier_name=supplier_name,
+            enable_signal_handler=False,
+        )
+
+        # Update status to completed
+        conversation_manager.update_task_status(
+            task_id,
+            ConversationStatus.COMPLETED,
+            conversation_id=result.get("conversation_id"),
+            total_messages=result.get("total_messages", 0),
+        )
+
+    except Exception as e:
+        # Update status to failed
+        conversation_manager.update_task_status(
+            task_id, ConversationStatus.FAILED, error=str(e)
+        )
+        print(f"Error in background conversation: {e}")
+
+
+def start_agent_async(
+    agent_name: str, api_key: str = None, supplier_name: str = "Inconnu"
+) -> str:
+    """
+    Start an agent conversation asynchronously in a background thread.
+
+    Args:
+        agent_name: Name of the agent to call
+        api_key: ElevenLabs API key (or set ELEVENLABS_API_KEY env var)
+        supplier_name: Name of the supplier
+
+    Returns:
+        str: Task ID to track the conversation status
+    """
+    if api_key is None:
+        api_key = os.environ.get("ELEVENLABS_API_KEY")
+
+    # Create a task
+    task = conversation_manager.create_task(agent_name, supplier_name)
+
+    # Start the conversation in a background thread
+    thread = threading.Thread(
+        target=call_agent_background,
+        args=(task.task_id, agent_name, api_key, supplier_name),
+        daemon=True,
+    )
+    thread.start()
+
+    return task.task_id
