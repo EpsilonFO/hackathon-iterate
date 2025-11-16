@@ -1,0 +1,18 @@
+{
+  "conversation_id": "conv_9201ka60ngtaev6tv516qmwz72rp",
+  "supplier_name": "Pharma Depot Plus South",
+  "agent_id": "agent_6101ka4ss33nfezrrz3jprjk86f2",
+  "agent_name": "delivery",
+  "timestamp": "2025-11-16T10:42:11.713018",
+  "messages": [
+    {
+      "role": "agent",
+      "text": "Hey there, I'm the assistant of the pharmacy. I wanted to know about my delivery status."
+    },
+    {
+      "role": "user",
+      "text": "I don't care. I just want to add..."
+    }
+  ],
+  "total_messages": 2
+}

@@ -1,0 +1,17 @@
+{
+  "conversation_id": "conv_9701ka60prndf369xeeq5633g71q",
+  "supplier_name": "Pharma Depot Plus South",
+  "agent_id": "agent_5401ka49jhknfwcraz1c3jgwpf7a",
+  "timestamp": "2025-11-16T10:42:57.429073",
+  "messages": [
+    {
+      "role": "agent",
+      "text": "Hey there, I'm the assistant of the pharmacy. Who's there ?"
+    },
+    {
+      "role": "user",
+      "text": "Hello, I'm a reseller and I actually have a product for you. It's a pancreas cancer drug. It costs 10 euros. I have one of them. It takes five days to deliver. Thank you. Goodbye."
+    }
+  ],
+  "total_messages": 2
+}
