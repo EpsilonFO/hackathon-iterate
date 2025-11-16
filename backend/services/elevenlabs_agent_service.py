@@ -206,17 +206,32 @@ def make_outbound_call(
                     ]:
                         print(f"\n✓ Call ended with status: {status}")
 
-                        # Wait a bit more for ElevenLabs to process the transcript
-                        print("   Waiting 1 second for transcript to be processed...")
-                        time.sleep(1)
-
                         if auto_save_transcript and conversation_id:
-                            # Try to fetch and save the transcript from ElevenLabs
-                            try:
-                                print("   Fetching transcript from ElevenLabs...")
+                            # Try to fetch and save the transcript from ElevenLabs with retries
+                            messages = []
+                            max_retries = 5
+                            retry_delay = 2  # Start with 2 seconds
 
-                                # Try using conversational_ai.conversations.get to get conversation details
+                            for attempt in range(max_retries):
                                 try:
+                                    print(
+                                        f"   Fetching transcript from ElevenLabs (attempt {attempt + 1}/{max_retries})..."
+                                    )
+
+                                    # Wait before fetching (longer wait for first attempt)
+                                    if attempt > 0:
+                                        print(
+                                            f"   Waiting {retry_delay} seconds before retry..."
+                                        )
+                                        time.sleep(retry_delay)
+                                        retry_delay *= 2  # Exponential backoff
+                                    else:
+                                        print(
+                                            "   Waiting 3 seconds for transcript to be processed..."
+                                        )
+                                        time.sleep(3)
+
+                                    # Get conversation details
                                     conv_details = (
                                         client.conversational_ai.conversations.get(
                                             conversation_id=conversation_id
@@ -224,13 +239,24 @@ def make_outbound_call(
                                     )
                                     print("   ✓ Conversation details retrieved!")
 
-                                    # Extract messages from transcript
+                                    # Debug: Print available attributes
+                                    print(
+                                        f"   Debug: conv_details attributes: {dir(conv_details)}"
+                                    )
+
+                                    # Extract messages from transcript - check multiple possible attributes
                                     messages = []
+
+                                    # Try transcript attribute first
                                     if (
                                         hasattr(conv_details, "transcript")
                                         and conv_details.transcript
                                     ):
+                                        print(
+                                            f"   Found transcript attribute with {len(conv_details.transcript)} turns"
+                                        )
                                         for turn in conv_details.transcript:
+                                            # Handle different turn formats
                                             if hasattr(turn, "role") and hasattr(
                                                 turn, "message"
                                             ):
@@ -240,44 +266,131 @@ def make_outbound_call(
                                                         "text": turn.message,
                                                     }
                                                 )
+                                            elif hasattr(turn, "role") and hasattr(
+                                                turn, "text"
+                                            ):
+                                                messages.append(
+                                                    {
+                                                        "role": turn.role,
+                                                        "text": turn.text,
+                                                    }
+                                                )
+                                            elif isinstance(turn, dict):
+                                                # Handle dict format
+                                                if "role" in turn and "message" in turn:
+                                                    messages.append(
+                                                        {
+                                                            "role": turn["role"],
+                                                            "text": turn["message"],
+                                                        }
+                                                    )
+                                                elif "role" in turn and "text" in turn:
+                                                    messages.append(
+                                                        {
+                                                            "role": turn["role"],
+                                                            "text": turn["text"],
+                                                        }
+                                                    )
 
-                                    print(
-                                        f"   ✓ Extracted {len(messages)} messages from transcript"
-                                    )
+                                    # Try messages attribute as fallback
+                                    if (
+                                        not messages
+                                        and hasattr(conv_details, "messages")
+                                        and conv_details.messages
+                                    ):
+                                        print(
+                                            f"   Found messages attribute with {len(conv_details.messages)} messages"
+                                        )
+                                        for msg in conv_details.messages:
+                                            if hasattr(msg, "role") and hasattr(
+                                                msg, "content"
+                                            ):
+                                                messages.append(
+                                                    {
+                                                        "role": msg.role,
+                                                        "text": msg.content,
+                                                    }
+                                                )
+                                            elif isinstance(msg, dict):
+                                                if "role" in msg and "content" in msg:
+                                                    messages.append(
+                                                        {
+                                                            "role": msg["role"],
+                                                            "text": msg["content"],
+                                                        }
+                                                    )
 
-                                    transcript_result = {
-                                        "conversation_id": conversation_id,
-                                        "supplier_name": supplier_name,
-                                        "agent_id": agent_id,
-                                        "timestamp": datetime.now().isoformat(),
-                                        "messages": messages,
-                                        "total_messages": len(messages),
-                                    }
-                                    save_transcript(transcript_result)
+                                    # Try history attribute as fallback
+                                    if (
+                                        not messages
+                                        and hasattr(conv_details, "history")
+                                        and conv_details.history
+                                    ):
+                                        print(
+                                            f"   Found history attribute with {len(conv_details.history)} items"
+                                        )
+                                        for item in conv_details.history:
+                                            if hasattr(item, "role") and hasattr(
+                                                item, "message"
+                                            ):
+                                                messages.append(
+                                                    {
+                                                        "role": item.role,
+                                                        "text": item.message,
+                                                    }
+                                                )
+                                            elif isinstance(item, dict):
+                                                if "role" in item and "message" in item:
+                                                    messages.append(
+                                                        {
+                                                            "role": item["role"],
+                                                            "text": item["message"],
+                                                        }
+                                                    )
+
+                                    if messages:
+                                        print(
+                                            f"   ✓ Extracted {len(messages)} messages from transcript"
+                                        )
+                                        break
+                                    else:
+                                        print(
+                                            f"   ⚠️  No messages found in transcript (attempt {attempt + 1}/{max_retries})"
+                                        )
+                                        if attempt < max_retries - 1:
+                                            print(
+                                                f"   Will retry in {retry_delay} seconds..."
+                                            )
+
                                 except Exception as inner_e:
-                                    print(f"   ⚠️  Could not get signed URL: {inner_e}")
-
-                                    # Save minimal call info
                                     print(
-                                        "   Saving call info without full transcript..."
+                                        f"   ⚠️  Error fetching transcript (attempt {attempt + 1}/{max_retries}): {inner_e}"
                                     )
-                                    transcript_result = {
-                                        "conversation_id": conversation_id,
-                                        "supplier_name": supplier_name,
-                                        "agent_id": agent_id,
-                                        "timestamp": datetime.now().isoformat(),
-                                        "call_sid": call_sid,
-                                        "call_status": status,
-                                        "status": "completed",
-                                        "note": f"View transcript in ElevenLabs dashboard with ID: {conversation_id}",
-                                    }
-                                    save_transcript(transcript_result)
+                                    if attempt < max_retries - 1:
+                                        print(
+                                            f"   Will retry in {retry_delay} seconds..."
+                                        )
+                                    else:
+                                        print(
+                                            f"   ⚠️  Could not retrieve transcript after {max_retries} attempts"
+                                        )
 
-                            except Exception as e:
-                                print(f"   ⚠️  Error fetching transcript: {e}")
-                                print("   Saving call info...")
-
-                                # Always save call info
+                            # Save transcript result
+                            if messages:
+                                transcript_result = {
+                                    "conversation_id": conversation_id,
+                                    "supplier_name": supplier_name,
+                                    "agent_id": agent_id,
+                                    "timestamp": datetime.now().isoformat(),
+                                    "messages": messages,
+                                    "total_messages": len(messages),
+                                }
+                                save_transcript(transcript_result)
+                            else:
+                                # Save minimal call info if transcript is still empty
+                                print(
+                                    "   ⚠️  Saving call info without full transcript..."
+                                )
                                 transcript_result = {
                                     "conversation_id": conversation_id,
                                     "supplier_name": supplier_name,
@@ -286,6 +399,9 @@ def make_outbound_call(
                                     "call_sid": call_sid,
                                     "call_status": status,
                                     "status": "completed",
+                                    "messages": [],
+                                    "total_messages": 0,
+                                    "note": f"View transcript in ElevenLabs dashboard with ID: {conversation_id}",
                                 }
                                 save_transcript(transcript_result)
 
@@ -297,6 +413,8 @@ def make_outbound_call(
                             "call_sid": call_sid,
                             "call_status": status,
                             "status": "completed",
+                            "messages": messages,
+                            "total_messages": len(messages),
                         }
 
                 except Exception as e:
