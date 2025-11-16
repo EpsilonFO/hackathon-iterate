@@ -1,0 +1,42 @@
+{
+  "conversation_id": "conv_8001ka60b9z1epvrdbk3ak3hw5nh",
+  "supplier_name": "Pharma Depot Plus South",
+  "agent_id": "agent_5401ka49jhknfwcraz1c3jgwpf7a",
+  "agent_name": "products",
+  "timestamp": "2025-11-16T10:37:29.185392",
+  "messages": [
+    {
+      "role": "agent",
+      "text": "Hey there, I'm the assistant of the pharmacy. Who's there ?"
+    },
+    {
+      "role": "user",
+      "text": "Hello, it's from my depot plus house. I'm sorry, I'm a little bit on the move. I'm not sure if I can make it."
+    },
+    {
+      "role": "agent",
+      "text": "Understood. Can you hear me clearly now?"
+    },
+    {
+      "role": "user",
+      "text": "Yeah, I'm from my depot plus house."
+    },
+    {
+      "role": "agent",
+      "text": "Alright. Do you have Ibuprofen 400mg - 30 tablets in stock today?"
+    },
+    {
+      "role": "user",
+      "text": "Yes, I do have ibuprofen 40 milligrams of tablet at $1 per unit. I have 1,000 units and seven days delivery. Sure."
+    },
+    {
+      "role": "agent",
+      "text": "Perfect. What's the minimum order quantity?"
+    },
+    {
+      "role": "user",
+      "text": "There is no minimum quantity but I also have very good product which is a Broth Abandoned Dinosaur which costs 5 euros and I have 1,000 of them and the delivery time is 14 days. Goodbye!"
+    }
+  ],
+  "total_messages": 8
+}

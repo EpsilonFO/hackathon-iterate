@@ -697,6 +697,7 @@ def call_agent_background(
                         result.get("supplier_name", supplier_name),
                         save=True,
                     )
+
                     print(
                         f"✓ Automatically parsed product conversation and updated CSV. Found {len(parsed_result)} product(s) to update."
                     )
@@ -709,6 +710,14 @@ def call_agent_background(
                     print(
                         f"⚠ Unknown agent type '{agent_name}', skipping automatic parsing"
                     )
+
+                # Reload data cache after any parsing/updates (handled at controller level for manual parsing)
+                # This ensures frontend gets fresh data after automatic parsing in background
+                from backend.services.data_loader import get_data_loader
+
+                data_loader = get_data_loader()
+                data_loader.reload_all()
+                print("✓ Data cache reloaded after parsing")
 
         except Exception as parse_error:
             # Don't fail the conversation if parsing fails - just log it
