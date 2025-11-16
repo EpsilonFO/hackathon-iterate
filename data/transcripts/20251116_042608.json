@@ -1,0 +1,46 @@
+{
+  "conversation_id": "conv_8501ka5b4esse1sadhmy95n5h0gw",
+  "supplier_name": "Pharma Depot Plus South",
+  "agent_id": "agent_5401ka49jhknfwcraz1c3jgwpf7a",
+  "agent_name": "products",
+  "timestamp": "2025-11-16T04:26:08.296185",
+  "messages": [
+    {
+      "role": "agent",
+      "text": "Hey there, I'm the assistant of the pharmacy. Who's there ?"
+    },
+    {
+      "role": "user",
+      "text": "Pharma Depot plus South."
+    },
+    {
+      "role": "agent",
+      "text": "Understood. Do you have Ibuprofen four hundred milligrams, thirty tablets in stock today?"
+    },
+    {
+      "role": "user",
+      "text": "Yes, I have it. I have 1,000 of them, seven days delivery, $10 a box."
+    },
+    {
+      "role": "agent",
+      "text": "Perfect. What's the minimum order quantity?"
+    },
+    {
+      "role": "user",
+      "text": "1,000."
+    },
+    {
+      "role": "agent",
+      "text": "Alright. Any discounts available?"
+    },
+    {
+      "role": "user",
+      "text": "No, goodbye!"
+    },
+    {
+      "role": "agent",
+      "text": "Thank you. Goodbye."
+    }
+  ],
+  "total_messages": 9
+}

@@ -191,13 +191,13 @@ const SuppliersROI = () => {
       await response.json();
 
       toast({
-        title: "Follow Up",
+        title: "Delivery Follow Up",
         description: `Agent started for ${supplierName}`,
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: `Failed to start follow up for ${supplierName}`,
+        description: `Failed to start delivery follow up for ${supplierName}`,
         variant: "destructive",
       });
       console.error('Error starting agent:', error);
@@ -367,8 +367,8 @@ const SuppliersROI = () => {
                               className="w-full justify-start"
                               onClick={() => handleRemindSupplier(supplier.name)}
                             >
-                              <Phone className="h-4 w-4 mr-2" />
-                              Follow Up
+                              <Truck className="h-4 w-4 mr-2" />
+                              Delivery Follow Up
                             </Button>
                           </div>
                         </PopoverContent>
@@ -451,8 +451,8 @@ const SuppliersROI = () => {
                         className="w-full justify-start"
                         onClick={() => handleRemindSupplier(supplier.name)}
                       >
-                        <Phone className="h-4 w-4 mr-2" />
-                        Follow Up
+                        <Truck className="h-4 w-4 mr-2" />
+                        Delivery Follow Up
                       </Button>
                     </div>
                   </PopoverContent>

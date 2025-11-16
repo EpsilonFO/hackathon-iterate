@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Search, AlertTriangle, TrendingDown, Phone, TrendingUp, Package, Clock, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { productsApi, type InventoryProduct, type SupplierOption } from "@/lib/api";
+import { productsApi, agentApi, type InventoryProduct, type SupplierOption } from "@/lib/api";
 
 const InventoryOrders = () => {
   const { toast } = useToast();
@@ -79,30 +79,17 @@ const InventoryOrders = () => {
     urgency: "normal"
   });
 
-  const handleCheckAvailability = async (productName: string) => {
+  const handleCheckAvailability = async (productName: string, supplierName: string) => {
     try {
-      const response = await fetch('/api/agent/start', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          agent_name: "availability",
-          product_name: productName,
-        }),
+      const response = await agentApi.startConversation({
+        agent_name: "availability",
+        product_name: productName,
+        supplier_name: supplierName,
       });
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error('API Error:', errorData);
-        throw new Error(`Failed to start agent: ${response.status} ${response.statusText}`);
-      }
-
-      await response.json();
 
       toast({
         title: "Checking Availability",
-        description: `Voice agent is calling suppliers for ${productName}`,
+        description: `Voice agent is calling ${supplierName} for ${productName}`,
       });
     } catch (error) {
       toast({
@@ -395,7 +382,7 @@ const InventoryOrders = () => {
 
               {/* Actions */}
               <div className="flex-shrink-0">
-                <Button onClick={() => handleCheckAvailability(product.name)} size="sm" variant="outline" className="flex items-center gap-2">
+                <Button onClick={() => handleCheckAvailability(product.name, product.supplier)} size="sm" variant="outline" className="flex items-center gap-2">
                   <Phone className="h-3 w-3" />
                   Check availability
                 </Button>

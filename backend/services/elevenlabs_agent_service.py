@@ -1,18 +1,19 @@
 import json
 import os
-import signal
 import threading
 from datetime import datetime
 
+import pandas as pd
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
-from elevenlabs.conversational_ai.conversation import Conversation
-from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInterface
 
 from backend.services.conversation_manager import (
     ConversationStatus,
     conversation_manager,
 )
+from backend.services.order_delivery_parser_service import OrderDeliveryParser
+from backend.services.order_updater_service import OrderUpdater
+from backend.services.transcript_parser_service import TranscriptParserService
 
 # Load environment variables
 load_dotenv()
@@ -21,6 +22,8 @@ load_dotenv()
 messages = []
 conversation_instance = None  # Store conversation instance globally
 current_supplier_name = "Inconnu"  # Store current supplier name for callbacks
+current_agent_name = "products"  # Store current agent name for callbacks
+transcript_saved = False  # Flag to prevent duplicate transcript saves
 
 # Goodbye keywords to detect end of conversation
 GOODBYE_KEYWORDS = [
@@ -91,6 +94,7 @@ def should_end_conversation(text: str) -> bool:
 
     return False
 
+
 def make_outbound_call(
     agent_id: str,
     agent_phone_number_id: str,
@@ -98,7 +102,7 @@ def make_outbound_call(
     api_key: str = None,
     supplier_name: str = "Inconnu",
     wait_for_completion: bool = False,
-    auto_save_transcript: bool = True
+    auto_save_transcript: bool = True,
 ):
     """
     Make an outbound call using ElevenLabs Conversational AI via Twilio.
@@ -119,12 +123,14 @@ def make_outbound_call(
         api_key = os.environ.get("ELEVENLABS_API_KEY")
 
     if not api_key:
-        raise ValueError("ELEVENLABS_API_KEY must be set in .env or passed as parameter")
+        raise ValueError(
+            "ELEVENLABS_API_KEY must be set in .env or passed as parameter"
+        )
 
     # Initialize ElevenLabs client
     client = ElevenLabs(api_key=api_key)
 
-    print(f"Making outbound call...")
+    print("Making outbound call...")
     print(f"  Agent ID: {agent_id}")
     print(f"  Agent Phone Number ID: {agent_phone_number_id}")
     print(f"  To Number: {to_number}")
@@ -133,32 +139,33 @@ def make_outbound_call(
     result = client.conversational_ai.twilio.outbound_call(
         agent_id=agent_id,
         agent_phone_number_id=agent_phone_number_id,
-        to_number=to_number
+        to_number=to_number,
     )
 
-    print(f"\n✓ Call initiated successfully!")
+    print("\n✓ Call initiated successfully!")
     print(f"  Result: {result}")
 
     # Extract call_sid and conversation_id
     call_sid = None
     conversation_id = None
 
-    if hasattr(result, 'call_sid'):
+    if hasattr(result, "call_sid"):
         call_sid = result.call_sid
         print(f"  Call SID: {call_sid}")
 
-    if hasattr(result, 'call_id'):
+    if hasattr(result, "call_id"):
         conversation_id = result.call_id
         print(f"  Call ID (Conversation ID): {conversation_id}")
-    elif hasattr(result, 'conversation_id'):
+    elif hasattr(result, "conversation_id"):
         conversation_id = result.conversation_id
         print(f"  Conversation ID: {conversation_id}")
 
-    print(f"\n⏳ The call is now active on Twilio.")
+    print("\n⏳ The call is now active on Twilio.")
 
     # If wait_for_completion is True, poll Twilio until call is done
     if wait_for_completion and call_sid:
         import time
+
         from twilio.rest import Client as TwilioClient
 
         twilio_account_sid = os.getenv("TWILIO_ACCOUNT_SID")
@@ -170,8 +177,8 @@ def make_outbound_call(
         else:
             twilio_client = TwilioClient(twilio_account_sid, twilio_auth_token)
 
-            print(f"\n⏳ Waiting for call to complete...")
-            print(f"   Monitoring Twilio call status (checking every 5 seconds)")
+            print("\n⏳ Waiting for call to complete...")
+            print("   Monitoring Twilio call status (checking every 5 seconds)")
 
             max_wait_time = 600  # 10 minutes max
             check_interval = 5  # Check every 5 seconds
@@ -190,34 +197,53 @@ def make_outbound_call(
 
                     # Check if call is completed
                     # Possible statuses: queued, ringing, in-progress, completed, busy, failed, no-answer, canceled
-                    if status in ['completed', 'busy', 'failed', 'no-answer', 'canceled']:
+                    if status in [
+                        "completed",
+                        "busy",
+                        "failed",
+                        "no-answer",
+                        "canceled",
+                    ]:
                         print(f"\n✓ Call ended with status: {status}")
 
                         # Wait a bit more for ElevenLabs to process the transcript
-                        print(f"   Waiting 1 second for transcript to be processed...")
+                        print("   Waiting 1 second for transcript to be processed...")
                         time.sleep(1)
 
                         if auto_save_transcript and conversation_id:
                             # Try to fetch and save the transcript from ElevenLabs
                             try:
-                                print(f"   Fetching transcript from ElevenLabs...")
+                                print("   Fetching transcript from ElevenLabs...")
 
                                 # Try using conversational_ai.conversations.get to get conversation details
                                 try:
-                                    conv_details = client.conversational_ai.conversations.get(conversation_id=conversation_id)
-                                    print(f"   ✓ Conversation details retrieved!")
+                                    conv_details = (
+                                        client.conversational_ai.conversations.get(
+                                            conversation_id=conversation_id
+                                        )
+                                    )
+                                    print("   ✓ Conversation details retrieved!")
 
                                     # Extract messages from transcript
                                     messages = []
-                                    if hasattr(conv_details, 'transcript') and conv_details.transcript:
+                                    if (
+                                        hasattr(conv_details, "transcript")
+                                        and conv_details.transcript
+                                    ):
                                         for turn in conv_details.transcript:
-                                            if hasattr(turn, 'role') and hasattr(turn, 'message'):
-                                                messages.append({
-                                                    "role": turn.role,
-                                                    "text": turn.message
-                                                })
+                                            if hasattr(turn, "role") and hasattr(
+                                                turn, "message"
+                                            ):
+                                                messages.append(
+                                                    {
+                                                        "role": turn.role,
+                                                        "text": turn.message,
+                                                    }
+                                                )
 
-                                    print(f"   ✓ Extracted {len(messages)} messages from transcript")
+                                    print(
+                                        f"   ✓ Extracted {len(messages)} messages from transcript"
+                                    )
 
                                     transcript_result = {
                                         "conversation_id": conversation_id,
@@ -225,14 +251,16 @@ def make_outbound_call(
                                         "agent_id": agent_id,
                                         "timestamp": datetime.now().isoformat(),
                                         "messages": messages,
-                                        "total_messages": len(messages)
+                                        "total_messages": len(messages),
                                     }
                                     save_transcript(transcript_result)
                                 except Exception as inner_e:
                                     print(f"   ⚠️  Could not get signed URL: {inner_e}")
 
                                     # Save minimal call info
-                                    print(f"   Saving call info without full transcript...")
+                                    print(
+                                        "   Saving call info without full transcript..."
+                                    )
                                     transcript_result = {
                                         "conversation_id": conversation_id,
                                         "supplier_name": supplier_name,
@@ -241,13 +269,13 @@ def make_outbound_call(
                                         "call_sid": call_sid,
                                         "call_status": status,
                                         "status": "completed",
-                                        "note": f"View transcript in ElevenLabs dashboard with ID: {conversation_id}"
+                                        "note": f"View transcript in ElevenLabs dashboard with ID: {conversation_id}",
                                     }
                                     save_transcript(transcript_result)
 
                             except Exception as e:
                                 print(f"   ⚠️  Error fetching transcript: {e}")
-                                print(f"   Saving call info...")
+                                print("   Saving call info...")
 
                                 # Always save call info
                                 transcript_result = {
@@ -257,7 +285,7 @@ def make_outbound_call(
                                     "timestamp": datetime.now().isoformat(),
                                     "call_sid": call_sid,
                                     "call_status": status,
-                                    "status": "completed"
+                                    "status": "completed",
                                 }
                                 save_transcript(transcript_result)
 
@@ -268,13 +296,13 @@ def make_outbound_call(
                             "timestamp": datetime.now().isoformat(),
                             "call_sid": call_sid,
                             "call_status": status,
-                            "status": "completed"
+                            "status": "completed",
                         }
 
                 except Exception as e:
                     print(f"   Error checking Twilio status: {e}")
 
-            print(f"\n⚠️  Maximum wait time reached.")
+            print("\n⚠️  Maximum wait time reached.")
 
     return {
         "conversation_id": conversation_id,
@@ -282,8 +310,9 @@ def make_outbound_call(
         "agent_id": agent_id,
         "timestamp": datetime.now().isoformat(),
         "call_sid": call_sid,
-        "status": "call_initiated"
+        "status": "call_initiated",
     }
+
 
 def call_agent(
     agent_name: str,
@@ -334,9 +363,10 @@ def call_agent(
         auto_save_transcript=True,
     )
 
-    print(f"\n✓ Call completed!")
+    print("\n✓ Call completed!")
     print(f"  Conversation ID: {result.get('conversation_id')}")
 
+    result["agent_name"] = agent_name
     return result
 
 
@@ -350,7 +380,7 @@ def capture_message(role: str, text: str):
 
 def capture_agent_message(text: str, conversation):
     """Callback function to capture agent messages and detect goodbye"""
-    global messages, current_supplier_name
+    global messages, current_supplier_name, transcript_saved
 
     # Capture the message
     message = {"role": "agent", "text": text}
@@ -368,8 +398,8 @@ def capture_agent_message(text: str, conversation):
             conversation.end_session()
         except Exception as e:
             print(f"Note: {e}")
-        save_transcript_on_exit(current_supplier_name)
-        exit(0)
+        # Don't save transcript here - let call_agent_background save it with the real conversation_id
+        # The conversation.end_session() above will cause wait_for_session_end() to return
 
 
 def save_transcript(
@@ -387,11 +417,11 @@ def save_transcript(
             session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"{folder}/{session_id}.json"
         else:
-            # Fallback to timestamp if no conversation_id
             session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"{folder}/transcript_{session_id}.json"
 
-    with open(filename, "w") as f:
+        filename = f"{folder}/{session_id}.json"
+
+    with open(filename, "w", encoding="utf-8") as f:
         json.dump(transcript_data, f, indent=2, default=str)
 
     print(f"\n✓ Transcript saved to {filename}")
@@ -400,7 +430,10 @@ def save_transcript(
 
 def save_transcript_on_exit(supplier_name: str = "Inconnu"):
     """Save transcript when interrupted"""
-    global messages
+    global messages, current_agent_name, transcript_saved
+    if transcript_saved:
+        print("\n! Transcript already saved, skipping duplicate save")
+        return
     if messages:
         # Generate a session ID based on timestamp
         session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -408,11 +441,13 @@ def save_transcript_on_exit(supplier_name: str = "Inconnu"):
             "conversation_id": session_id,
             "supplier_name": supplier_name,
             "agent_id": os.getenv("AGENT_PRODUCTS_ID"),
+            "agent_name": current_agent_name,
             "timestamp": datetime.now().isoformat(),
             "messages": messages,
             "total_messages": len(messages),
         }
         save_transcript(result)
+        transcript_saved = True
         print(f"✓ Messages captured in this conversation: {len(messages)}")
     else:
         print("\n! No messages to save")
@@ -443,17 +478,24 @@ def call_agent_background(
             enable_signal_handler=False,
         )
 
-        # Save the transcript to file
-        # Ensure supplier_name is preserved from the result (in case it was modified)
-        transcript_data = {
-            "conversation_id": result.get("conversation_id"),
-            "supplier_name": result.get("supplier_name", supplier_name),
-            "agent_id": result.get("agent_id"),
-            "timestamp": result.get("timestamp"),
-            "messages": result.get("messages", []),
-            "total_messages": result.get("total_messages", 0),
-        }
-        save_transcript(transcript_data)
+        # Save the transcript to file only if it hasn't been saved already
+        # (e.g., if save_transcript_on_exit was called when agent said goodbye)
+        global transcript_saved
+        if not transcript_saved:
+            # Ensure supplier_name is preserved from the result (in case it was modified)
+            transcript_data = {
+                "conversation_id": result.get("conversation_id"),
+                "supplier_name": result.get("supplier_name", supplier_name),
+                "agent_id": result.get("agent_id"),
+                "agent_name": agent_name,
+                "timestamp": result.get("timestamp"),
+                "messages": result.get("messages", []),
+                "total_messages": result.get("total_messages", 0),
+            }
+            save_transcript(transcript_data)
+            transcript_saved = True
+        else:
+            print("✓ Transcript already saved (skipping duplicate)")
 
         # Update status to completed
         conversation_manager.update_task_status(
@@ -462,6 +504,99 @@ def call_agent_background(
             conversation_id=result.get("conversation_id"),
             total_messages=result.get("total_messages", 0),
         )
+
+        # Automatically parse the conversation and update CSVs based on agent type
+        try:
+            anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not anthropic_api_key:
+                print("⚠ ANTHROPIC_API_KEY not set, skipping automatic parsing")
+            else:
+                # Get the saved transcript data
+                transcript_data = {
+                    "conversation_id": result.get("conversation_id"),
+                    "supplier_name": result.get("supplier_name", supplier_name),
+                    "agent_id": result.get("agent_id"),
+                    "agent_name": agent_name,
+                    "timestamp": result.get("timestamp"),
+                    "messages": result.get("messages", []),
+                    "total_messages": result.get("total_messages", 0),
+                }
+
+                # Route to appropriate parser based on agent type
+                if agent_name == "delivery":
+                    # Format transcript as text string for delivery parser
+                    transcript_text = "\n\n".join(
+                        [
+                            f"{msg.get('role', 'unknown').capitalize()}: {msg.get('text', '')}"
+                            for msg in result.get("messages", [])
+                        ]
+                    )
+
+                    parser = OrderDeliveryParser(api_key=anthropic_api_key)
+                    parsed_updates = parser.parse_conversation(
+                        transcript=transcript_text,
+                        supplier_name=result.get("supplier_name", supplier_name),
+                    )
+
+                    if parsed_updates:
+                        # Load supplier mapping
+                        supplier_df = pd.read_csv("./data/fournisseur.csv")
+                        supplier_mapping = dict(
+                            zip(supplier_df["name"], supplier_df["id"])
+                        )
+
+                        # Apply updates to orders.csv
+                        updater = OrderUpdater(csv_path="./data/orders.csv")
+                        updater.load_csv()
+                        successes, failures = updater.apply_updates(
+                            parsed_updates, supplier_mapping
+                        )
+                        updater.save_csv()
+
+                        print(
+                            f"✓ Automatically parsed delivery conversation and updated orders.csv. Found {len(parsed_updates)} order update(s)."
+                        )
+                        if successes:
+                            print(f"✓ {len(successes)} update(s) applied successfully")
+                        if failures:
+                            print(f"⚠ {len(failures)} update(s) failed: {failures}")
+                    else:
+                        print(
+                            "✓ Delivery conversation parsed but no order updates found."
+                        )
+
+                elif agent_name == "products":
+                    # Use TranscriptParserService for product conversations
+
+                    parser = TranscriptParserService(
+                        api_key=anthropic_api_key, data_dir="./data"
+                    )
+                    parsed_result = parser.parse_and_update_csv(
+                        transcript_data,
+                        result.get("supplier_name", supplier_name),
+                        save=True,
+                    )
+                    print(
+                        f"✓ Automatically parsed product conversation and updated CSV. Found {len(parsed_result)} product(s) to update."
+                    )
+
+                elif agent_name == "availability":
+                    # Skip parsing for availability conversations
+                    print("✓ Availability conversation completed (no parsing needed).")
+
+                else:
+                    print(
+                        f"⚠ Unknown agent type '{agent_name}', skipping automatic parsing"
+                    )
+
+        except Exception as parse_error:
+            # Don't fail the conversation if parsing fails - just log it
+            print(
+                f"⚠ Error during automatic parsing (conversation still marked as completed): {parse_error}"
+            )
+            import traceback
+
+            traceback.print_exc()
 
     except Exception as e:
         # Update status to failed
