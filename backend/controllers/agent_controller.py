@@ -24,6 +24,8 @@ class StartConversationRequest(BaseModel):
     api_key: Optional[str] = None
     supplier_name: Optional[str] = None
     product_name: Optional[str] = None
+    to_number: Optional[str] = None  # For Twilio calls
+    use_twilio: Optional[bool] = True  # If True, use Twilio outbound call
 
 
 class ConversationResponse(BaseModel):
@@ -69,7 +71,8 @@ async def start_conversation(request: StartConversationRequest):
     the conversation status using the /status/{task_id} endpoint.
 
     Args:
-        request: StartConversationRequest with optional agent_name, api_key, and supplier_name
+        request: StartConversationRequest with optional agent_name, api_key, supplier_name,
+                 use_twilio, and to_number
 
     Returns:
         TaskStartResponse with task_id to track the conversation
@@ -79,13 +82,15 @@ async def start_conversation(request: StartConversationRequest):
     api_key = request.api_key or os.getenv("ELEVENLABS_API_KEY")
     supplier_name = request.supplier_name or "Inconnu"
     product_name = request.product_name or "Inconnu"
+    use_twilio = request.use_twilio if request.use_twilio is not None else True
+    to_number = request.to_number or os.getenv("MY_PHONE_NUMBER")
 
     # Update agent configuration
     update_agent(agent_name, product_name, supplier_name)
 
     # Give ElevenLabs API time to propagate the configuration update
     import time
-    time.sleep(1)  # Wait 2 seconds for the configuration to propagate
+    time.sleep(1)
 
     if not api_key:
         raise HTTPException(
@@ -94,18 +99,42 @@ async def start_conversation(request: StartConversationRequest):
         )
 
     try:
-        # Start the agent conversation asynchronously
-        task_id = start_agent_async(
-            agent_name=agent_name, api_key=api_key, supplier_name=supplier_name
-        )
+        # Choose between Twilio outbound call or local conversation
+        if use_twilio:
+            if not to_number:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Missing to_number for Twilio call. Please provide in request or set MY_PHONE_NUMBER env var.",
+                )
 
-        return TaskStartResponse(
-            task_id=task_id,
-            agent_name=agent_name,
-            supplier_name=supplier_name,
-            status="pending",
-            message=f"Conversation started in background. Use /api/agent/status/{task_id} to check status.",
-        )
+            print(f"Starting Twilio outbound call to {to_number}...")
+            task_id = start_agent_async(
+                agent_name=agent_name,
+                api_key=api_key,
+                supplier_name=supplier_name,
+            )
+
+            return TaskStartResponse(
+                task_id=task_id,
+                agent_name=agent_name,
+                supplier_name=supplier_name,
+                status="pending",
+                message=f"Twilio call started to {to_number}. Use /api/agent/status/{task_id} to check status.",
+            )
+        else:
+            # Start the agent conversation asynchronously (local microphone)
+            print("Starting local conversation...")
+            task_id = start_agent_async(
+                agent_name=agent_name, api_key=api_key, supplier_name=supplier_name
+            )
+
+            return TaskStartResponse(
+                task_id=task_id,
+                agent_name=agent_name,
+                supplier_name=supplier_name,
+                status="pending",
+                message=f"Conversation started in background. Use /api/agent/status/{task_id} to check status.",
+            )
 
     except Exception as e:
         raise HTTPException(
