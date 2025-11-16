@@ -10,17 +10,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Search, AlertTriangle, TrendingDown, Phone, TrendingUp, Package, Clock, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { productsApi, type InventoryProduct, type ActivePurchaseOrder, type SupplierOption } from "@/lib/api";
+import { productsApi, type InventoryProduct, type SupplierOption } from "@/lib/api";
 
 const InventoryOrders = () => {
   const { toast } = useToast();
   const [products, setProducts] = useState<InventoryProduct[]>([]);
-  const [orders, setOrders] = useState<ActivePurchaseOrder[]>([]);
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [productTypeFilter, setProductTypeFilter] = useState<"all" | "in-house" | "external">("all");
+  const [displayLimit, setDisplayLimit] = useState(10);
 
   // Helper function to round to 1 decimal place
   const round1 = (value: number): number => Math.round(value * 10) / 10;
@@ -64,6 +64,11 @@ const InventoryOrders = () => {
     
     return getPriority(a) - getPriority(b);
   });
+
+  // Limit displayed products
+  const displayedProducts = sortedProducts.slice(0, displayLimit);
+  const hasMoreProducts = sortedProducts.length > displayLimit;
+  const showLessButton = displayLimit > 10 && sortedProducts.length <= displayLimit;
   const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
   const [createPODialog, setCreatePODialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
   const [switchSupplierDialog, setSwitchSupplierDialog] = useState<{ open: boolean; product: InventoryProduct | null }>({ open: false, product: null });
@@ -112,12 +117,8 @@ const InventoryOrders = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [productsResponse, ordersResponse] = await Promise.all([
-          productsApi.getInStoreProducts(),
-          productsApi.getOrders(),
-        ]);
+        const productsResponse = await productsApi.getInStoreProducts();
         setProducts(productsResponse.products);
-        setOrders(ordersResponse.orders);
       } catch (error) {
         toast({
           title: "Error",
@@ -130,6 +131,11 @@ const InventoryOrders = () => {
     };
     fetchData();
   }, [toast]);
+
+  // Reset display limit when filters change
+  useEffect(() => {
+    setDisplayLimit(10);
+  }, [searchQuery, productTypeFilter]);
 
   // Fetch suppliers when switch supplier dialog opens
   useEffect(() => {
@@ -175,13 +181,6 @@ const InventoryOrders = () => {
     });
     setCreatePODialog({ open: false, product: null });
     setPOForm({ quantity: "", supplier: "", notes: "", urgency: "normal" });
-  };
-
-  const handleTrackPO = (poNumber: string) => {
-    toast({
-      title: "Tracking Purchase Order",
-      description: `Opening tracking details for ${poNumber}`,
-    });
   };
 
   const handleSwitchSupplier = (product: InventoryProduct) => {
@@ -274,7 +273,7 @@ const InventoryOrders = () => {
               </div>
             </Card>
           )}
-          {sortedProducts.map((product) => {
+          {displayedProducts.map((product) => {
             // Determine if product should be highlighted
             const isExternal = product.type === "external";
             const hasMarginImprovement = product.marginImprovementPossible;
@@ -404,56 +403,31 @@ const InventoryOrders = () => {
           </Card>
           );
           })}
+          
+          {/* See More / Show Less Button */}
+          {(hasMoreProducts || showLessButton) && (
+            <div className="flex justify-center pt-4">
+              {hasMoreProducts ? (
+                <Button
+                  variant="outline"
+                  onClick={() => setDisplayLimit(prev => prev + 10)}
+                  className="w-full max-w-xs"
+                >
+                  See more ({sortedProducts.length - displayLimit} remaining)
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => setDisplayLimit(10)}
+                  className="w-full max-w-xs"
+                >
+                  Show less
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       )}
-
-      {/* Active Purchase Orders */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Active Purchase Orders</h3>
-        {loading ? (
-          <div className="flex items-center justify-center gap-2 py-4">
-            <RefreshCw className="h-4 w-4 animate-spin" />
-            <span>Loading orders...</span>
-          </div>
-        ) : orders.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">No active purchase orders</p>
-        ) : (
-          <div className="space-y-3">
-            {orders.map((order) => {
-              const estimatedDate = new Date(order.estimated_delivery);
-              const now = new Date();
-              const daysUntil = Math.ceil((estimatedDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-              const isDelayed = order.status === "delayed";
-              const isOnTrack = order.status === "on_track";
-              
-              return (
-                <div key={order.order_id} className="flex items-center justify-between p-4 rounded-lg border border-border">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="font-mono text-sm font-medium text-foreground">{order.order_id}</span>
-                      {isDelayed && <Badge variant="destructive">Delayed</Badge>}
-                      {isOnTrack && <Badge className="bg-green-500 text-white">On Track</Badge>}
-                      {order.status === "pending" && <Badge className="bg-yellow-500 text-white">Pending</Badge>}
-                      <span className="text-sm text-muted-foreground">{order.supplier_name}</span>
-                    </div>
-                    <p className="text-sm text-foreground">{order.product_name} - {order.quantity} units</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {isDelayed && order.actual_delivery ? (
-                        <>Expected: {new Date(order.estimated_delivery).toLocaleDateString()} → Actual: {new Date(order.actual_delivery).toLocaleDateString()}</>
-                      ) : order.status === "pending" ? (
-                        <>Missing ETA confirmation</>
-                      ) : (
-                        <>Expected: {estimatedDate.toLocaleDateString()} {daysUntil > 0 ? `(in ${daysUntil} days)` : "(overdue)"}</>
-                      )}
-                    </p>
-                  </div>
-                  <Button onClick={() => handleTrackPO(order.order_id)} size="sm" variant="outline">Track</Button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
 
       {/* Product Details Dialog */}
       <Dialog open={detailsDialog.open} onOpenChange={(open) => setDetailsDialog({ open, product: null })}>
