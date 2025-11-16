@@ -1,14 +1,11 @@
 import json
 import os
-import signal
 import threading
 from datetime import datetime
 
 import pandas as pd
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
-from elevenlabs.conversational_ai.conversation import Conversation
-from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInterface
 
 from backend.services.conversation_manager import (
     ConversationStatus,
@@ -99,7 +96,13 @@ def should_end_conversation(text: str) -> bool:
 
 
 def make_outbound_call(
-    agent_id: str, agent_phone_number_id: str, to_number: str, api_key: str = None
+    agent_id: str,
+    agent_phone_number_id: str,
+    to_number: str,
+    api_key: str = None,
+    supplier_name: str = "Inconnu",
+    wait_for_completion: bool = False,
+    auto_save_transcript: bool = True,
 ):
     """
     Make an outbound call using ElevenLabs Conversational AI via Twilio.
@@ -109,9 +112,12 @@ def make_outbound_call(
         agent_phone_number_id: The ID of your Twilio phone number in ElevenLabs
         to_number: The phone number to call (E.164 format, e.g., +15551234567)
         api_key: Your ElevenLabs API key (or set ELEVENLABS_API_KEY env var)
+        supplier_name: Name of the supplier for the transcript
+        wait_for_completion: If True, wait for the call to complete before returning
+        auto_save_transcript: If True, automatically save transcript when call completes
 
     Returns:
-        dict: Call information
+        dict: Call information including conversation_id
     """
     if api_key is None:
         api_key = os.environ.get("ELEVENLABS_API_KEY")
@@ -139,13 +145,173 @@ def make_outbound_call(
     print("\n✓ Call initiated successfully!")
     print(f"  Result: {result}")
 
-    # Try to get call_id if it exists as an attribute
-    if hasattr(result, "call_id"):
-        print(f"  Call ID: {result.call_id}")
-    elif hasattr(result, "conversation_id"):
-        print(f"  Conversation ID: {result.conversation_id}")
+    # Extract call_sid and conversation_id
+    call_sid = None
+    conversation_id = None
 
-    return result
+    if hasattr(result, "call_sid"):
+        call_sid = result.call_sid
+        print(f"  Call SID: {call_sid}")
+
+    if hasattr(result, "call_id"):
+        conversation_id = result.call_id
+        print(f"  Call ID (Conversation ID): {conversation_id}")
+    elif hasattr(result, "conversation_id"):
+        conversation_id = result.conversation_id
+        print(f"  Conversation ID: {conversation_id}")
+
+    print("\n⏳ The call is now active on Twilio.")
+
+    # If wait_for_completion is True, poll Twilio until call is done
+    if wait_for_completion and call_sid:
+        import time
+
+        from twilio.rest import Client as TwilioClient
+
+        twilio_account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+        twilio_auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+
+        if not twilio_account_sid or not twilio_auth_token:
+            print("\n⚠️  Warning: TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN not set.")
+            print("   Cannot monitor call status. Returning immediately.")
+        else:
+            twilio_client = TwilioClient(twilio_account_sid, twilio_auth_token)
+
+            print("\n⏳ Waiting for call to complete...")
+            print("   Monitoring Twilio call status (checking every 5 seconds)")
+
+            max_wait_time = 600  # 10 minutes max
+            check_interval = 5  # Check every 5 seconds
+            elapsed_time = 0
+
+            while elapsed_time < max_wait_time:
+                time.sleep(check_interval)
+                elapsed_time += check_interval
+
+                try:
+                    # Get call status from Twilio
+                    call = twilio_client.calls(call_sid).fetch()
+                    status = call.status
+
+                    print(f"   Call status: {status} ({elapsed_time}s elapsed)")
+
+                    # Check if call is completed
+                    # Possible statuses: queued, ringing, in-progress, completed, busy, failed, no-answer, canceled
+                    if status in [
+                        "completed",
+                        "busy",
+                        "failed",
+                        "no-answer",
+                        "canceled",
+                    ]:
+                        print(f"\n✓ Call ended with status: {status}")
+
+                        # Wait a bit more for ElevenLabs to process the transcript
+                        print("   Waiting 1 second for transcript to be processed...")
+                        time.sleep(1)
+
+                        if auto_save_transcript and conversation_id:
+                            # Try to fetch and save the transcript from ElevenLabs
+                            try:
+                                print("   Fetching transcript from ElevenLabs...")
+
+                                # Try using conversational_ai.conversations.get to get conversation details
+                                try:
+                                    conv_details = (
+                                        client.conversational_ai.conversations.get(
+                                            conversation_id=conversation_id
+                                        )
+                                    )
+                                    print("   ✓ Conversation details retrieved!")
+
+                                    # Extract messages from transcript
+                                    messages = []
+                                    if (
+                                        hasattr(conv_details, "transcript")
+                                        and conv_details.transcript
+                                    ):
+                                        for turn in conv_details.transcript:
+                                            if hasattr(turn, "role") and hasattr(
+                                                turn, "message"
+                                            ):
+                                                messages.append(
+                                                    {
+                                                        "role": turn.role,
+                                                        "text": turn.message,
+                                                    }
+                                                )
+
+                                    print(
+                                        f"   ✓ Extracted {len(messages)} messages from transcript"
+                                    )
+
+                                    transcript_result = {
+                                        "conversation_id": conversation_id,
+                                        "supplier_name": supplier_name,
+                                        "agent_id": agent_id,
+                                        "timestamp": datetime.now().isoformat(),
+                                        "messages": messages,
+                                        "total_messages": len(messages),
+                                    }
+                                    save_transcript(transcript_result)
+                                except Exception as inner_e:
+                                    print(f"   ⚠️  Could not get signed URL: {inner_e}")
+
+                                    # Save minimal call info
+                                    print(
+                                        "   Saving call info without full transcript..."
+                                    )
+                                    transcript_result = {
+                                        "conversation_id": conversation_id,
+                                        "supplier_name": supplier_name,
+                                        "agent_id": agent_id,
+                                        "timestamp": datetime.now().isoformat(),
+                                        "call_sid": call_sid,
+                                        "call_status": status,
+                                        "status": "completed",
+                                        "note": f"View transcript in ElevenLabs dashboard with ID: {conversation_id}",
+                                    }
+                                    save_transcript(transcript_result)
+
+                            except Exception as e:
+                                print(f"   ⚠️  Error fetching transcript: {e}")
+                                print("   Saving call info...")
+
+                                # Always save call info
+                                transcript_result = {
+                                    "conversation_id": conversation_id,
+                                    "supplier_name": supplier_name,
+                                    "agent_id": agent_id,
+                                    "timestamp": datetime.now().isoformat(),
+                                    "call_sid": call_sid,
+                                    "call_status": status,
+                                    "status": "completed",
+                                }
+                                save_transcript(transcript_result)
+
+                        return {
+                            "conversation_id": conversation_id,
+                            "supplier_name": supplier_name,
+                            "agent_id": agent_id,
+                            "timestamp": datetime.now().isoformat(),
+                            "call_sid": call_sid,
+                            "call_status": status,
+                            "status": "completed",
+                        }
+
+                except Exception as e:
+                    print(f"   Error checking Twilio status: {e}")
+
+            print("\n⚠️  Maximum wait time reached.")
+
+    return {
+        "conversation_id": conversation_id,
+        "supplier_name": supplier_name,
+        "agent_id": agent_id,
+        "timestamp": datetime.now().isoformat(),
+        "call_sid": call_sid,
+        "status": "call_initiated",
+    }
 
 
 def call_agent(
@@ -155,7 +321,7 @@ def call_agent(
     enable_signal_handler: bool = True,
 ):
     """
-    Call an ElevenLabs conversational agent and return the transcript.
+    Call an ElevenLabs conversational agent via Twilio outbound call.
 
     Args:
         agent_name: The name of the agent (e.g., "delivery" or "products")
@@ -181,9 +347,7 @@ def call_agent(
     if api_key is None:
         api_key = os.environ.get("ELEVENLABS_API_KEY")
 
-    client = ElevenLabs(api_key=api_key)
-
-    # Start conversation with the agent using callbacks to capture transcript
+    # Get agent ID based on agent name
     if agent_name == "delivery":
         agent_id = os.getenv("AGENT_DELIVERY_ID")
     elif agent_name == "availability":
@@ -191,72 +355,41 @@ def call_agent(
     else:  # agent_name == "products":
         agent_id = os.getenv("AGENT_PRODUCTS_ID")
 
-    conversation = Conversation(
-        client=client,
+    # Get Twilio configuration
+    agent_phone_number_id = os.getenv("TWILIO_PHONE_NUMBER_ID")
+    to_number = os.getenv("MY_PHONE_NUMBER")
+
+    print(f"📞 Starting Twilio outbound call for {agent_name} agent...")
+    print(f"   Calling: {to_number}")
+    print(f"   Supplier: {supplier_name}\n")
+
+    # Make the outbound call with automatic transcript saving
+    result = make_outbound_call(
         agent_id=agent_id,
-        requires_auth=bool(api_key),
-        audio_interface=DefaultAudioInterface(),
-        # Callbacks to capture the conversation
-        callback_agent_response=lambda response: capture_agent_message(
-            response, conversation
-        ),
-        callback_user_transcript=lambda transcript: capture_message("user", transcript),
+        agent_phone_number_id=agent_phone_number_id,
+        to_number=to_number,
+        api_key=api_key,
+        supplier_name=supplier_name,
+        wait_for_completion=True,
+        auto_save_transcript=True,
     )
 
-    conversation_instance = conversation
+    print("\n✓ Call completed!")
+    print(f"  Conversation ID: {result.get('conversation_id')}")
 
-    print("Starting conversation with agent...")
-    print("Speak to begin. Say 'goodbye' to end the conversation, or press Ctrl+C.\n")
-
-    # Handle Ctrl+C gracefully to save transcript before exit
-    # Only set signal handler if running in main thread
-    if enable_signal_handler:
-
-        def signal_handler(sig, frame):
-            print("\n\nEnding conversation...")
-            try:
-                conversation.end_session()
-            except:
-                pass
-            # Save transcript immediately
-            save_transcript_on_exit(supplier_name)
-            exit(0)
-
-        try:
-            signal.signal(signal.SIGINT, signal_handler)
-        except ValueError:
-            # Signal handler can't be set in non-main thread, which is fine
-            print("(Running in background thread - Ctrl+C handler disabled)")
-
-    # Start the conversation
-    AGENT_PHONE_NUMBER_ID = os.getenv(
-        "TWILIO_PHONE_NUMBER_ID"
-    )  # You need to ad d this to .env
-    TO_NUMBER = os.getenv("MY_PHONE_NUMBER")  # You need to add this to .env
-    make_outbound_call(
-        agent_id=agent_id,
-        agent_phone_number_id=AGENT_PHONE_NUMBER_ID,
-        to_number=TO_NUMBER,
-    )
-    # conversation.start_session()
-
-    # Wait for conversation to complete
-    conversation_id = conversation.wait_for_session_end()
-
-    print("\n\nConversation ended!")
-    print(f"Conversation ID: {conversation_id}")
+    # return {
+    #     "conversation_id": conversation_id,
+    #     "supplier_name": supplier_name,
+    #     "agent_id": agent_id,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "call_sid": call_sid,
+    #     "status": "call_initiated"
+    # }
 
     # If transcript was already saved (e.g., on interrupt), don't save again
     # The conversation_id from ElevenLabs will be used when saving in call_agent_background
-    return {
-        "conversation_id": conversation_id,
-        "supplier_name": supplier_name,
-        "agent_id": agent_id,
-        "agent_name": agent_name,
-        "timestamp": datetime.now().isoformat(),
-        "messages": messages,
-        "total_messages": len(messages),
-    }
+    result["agent_name"] = agent_name
+    return result
 
 
 def capture_message(role: str, text: str):
